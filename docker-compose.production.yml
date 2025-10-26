@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=saaspe
+      - POSTGRES_PASSWORD=saaspe_prod_2025
+      - POSTGRES_DB=saaspe_production
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saaspe"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saaspe-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - saaspe-network
+
+  backend:
+    image: saaspe/backend:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://saaspe:saaspe_prod_2025@postgres:5432/saaspe_production?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${PRODUCTION_JWT_SECRET}
+      - AWS_ACCESS_KEY_ID=${PRODUCTION_AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${PRODUCTION_AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - SENTRY_ENVIRONMENT=production
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_ENV=production
+      - DD_SERVICE=saaspe-backend
+      - HUBSPOT_API_KEY=${HUBSPOT_API_KEY}
+      - DOCUSIGN_CLIENT_ID=${DOCUSIGN_CLIENT_ID}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      # Email Account Management Feature
+      - CLOUDWATCH_ENABLED=${CLOUDWATCH_ENABLED:-true}
+      - CLOUDWATCH_NAMESPACE=${CLOUDWATCH_NAMESPACE:-SaasPE/EmailAccounts}
+      - AWS_SECRET_NAME=${AWS_SECRET_NAME:-saaspe/encryption-key}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - saaspe-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    image: saaspe/frontend:latest
+    ports:
+      - "3002:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
+      - NEXT_PUBLIC_SENTRY_DSN=${SENTRY_DSN}
+      - NEXT_PUBLIC_SENTRY_ENVIRONMENT=production
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - saaspe-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: always
+    networks:
+      - saaspe-network
+
+networks:
+  saaspe-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
