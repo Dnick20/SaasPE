@@ -38,7 +38,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=staging
       - DATABASE_URL=postgresql://saaspe:saaspe_prod_2025@postgres:5432/saaspe_production?schema=public
       - REDIS_URL=redis://redis:6379
       - JWT_SECRET=${PRODUCTION_JWT_SECRET}
@@ -48,18 +48,23 @@ services:
       - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
-      - SENTRY_ENVIRONMENT=production
-      - DD_API_KEY=${DD_API_KEY}
-      - DD_ENV=production
+      - SENTRY_ENVIRONMENT=staging
+      - DD_API_KEY=${DD_API_KEY:-placeholder}
+      - DD_ENV=staging
       - DD_SERVICE=saaspe-backend
-      - HUBSPOT_API_KEY=${HUBSPOT_API_KEY}
+      - DD_TRACE_ENABLED=false
+      - HUBSPOT_API_KEY=${HUBSPOT_API_KEY:-placeholder}
       - DOCUSIGN_CLIENT_ID=${DOCUSIGN_CLIENT_ID}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - DOCUSIGN_CLIENT_SECRET=${DOCUSIGN_CLIENT_SECRET:-placeholder}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-placeholder}
       # Email Account Management Feature
       - CLOUDWATCH_ENABLED=${CLOUDWATCH_ENABLED:-true}
       - CLOUDWATCH_NAMESPACE=${CLOUDWATCH_NAMESPACE:-SaasPE/EmailAccounts}
       - AWS_SECRET_NAME=${AWS_SECRET_NAME:-saaspe/encryption-key}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      # Application URLs
+      - BACKEND_URL=http://localhost:3000
+      - FRONTEND_URL=http://localhost:3002
     restart: always
     depends_on:
       postgres:

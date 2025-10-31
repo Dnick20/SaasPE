@@ -1,0 +1,80 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+.pnpm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+
+# Build outputs
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Prisma
+prisma/migrations/*_migration.sql
+
+# Debug
+.pnp.*
+.yarn/*
+
+# Cache
+.eslintcache
+.turbo
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/terraform.tfstate
+infrastructure/terraform/terraform.tfstate.backup
+infrastructure/terraform/*.tfvars
+infrastructure/terraform/tfplan
+infrastructure/terraform/.terraform.lock.hcl
+
+# Docker
+docker-compose.override.yml
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Sensitive files
+*.pem
+*.key
+*.crt
+*.pfx
+secrets/
