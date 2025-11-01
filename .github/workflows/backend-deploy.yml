@@ -90,6 +90,24 @@ jobs:
           TD_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "taskdef_arn=$TD_ARN" >> $GITHUB_OUTPUT
 
+      - name: Create Sentry release
+        if: ${{ !cancelled() }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: o4510247421018112
+          SENTRY_PROJECT: saaspe-backend
+        run: |
+          # Install Sentry CLI
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          # Create release
+          export SENTRY_RELEASE="${{ github.sha }}"
+          sentry-cli releases new "$SENTRY_RELEASE"
+          sentry-cli releases set-commits "$SENTRY_RELEASE" --auto
+          sentry-cli releases finalize "$SENTRY_RELEASE"
+
+          echo "Sentry release created: $SENTRY_RELEASE"
+
       - name: Update service
         env:
           CLUSTER: ${{ env.ECS_CLUSTER }}
@@ -98,6 +116,17 @@ jobs:
         run: |
           aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASKDEF_ARN" --force-new-deployment > /dev/null
           aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+
+      - name: Mark Sentry release as deployed
+        if: success()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: o4510247421018112
+          SENTRY_PROJECT: saaspe-backend
+        run: |
+          export SENTRY_RELEASE="${{ github.sha }}"
+          sentry-cli releases deploys "$SENTRY_RELEASE" new -e production
+          echo "Sentry release deployed: $SENTRY_RELEASE"
 
       - name: Done
         run: echo "Deployed image ${{ github.sha }} to ${{ env.ECS_SERVICE }}"
