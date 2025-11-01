@@ -1,0 +1,100 @@
+name: Frontend Deploy (Vercel)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'saaspe-web/**'
+      - '.github/workflows/frontend-deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  deploy:
+    name: Build and Deploy to Vercel
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: saaspe-web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: saaspe-web/package-lock.json
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment Information
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        env:
+          NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: o4510247421018112
+          SENTRY_PROJECT: saaspe-web
+        run: |
+          # Install dependencies
+          npm ci
+
+          # Build with Sentry sourcemaps
+          export SENTRY_RELEASE="${{ github.sha }}"
+          vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Create Sentry release
+        if: ${{ !cancelled() }}
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: o4510247421018112
+          SENTRY_PROJECT: saaspe-web
+        run: |
+          # Install Sentry CLI
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          # Create release
+          export SENTRY_RELEASE="${{ github.sha }}"
+          sentry-cli releases new "$SENTRY_RELEASE"
+          sentry-cli releases set-commits "$SENTRY_RELEASE" --auto
+
+          # Upload sourcemaps
+          sentry-cli releases files "$SENTRY_RELEASE" upload-sourcemaps .next --url-prefix '~/_next'
+
+          # Finalize release
+          sentry-cli releases finalize "$SENTRY_RELEASE"
+
+          echo "Sentry release created with sourcemaps: $SENTRY_RELEASE"
+
+      - name: Deploy to Vercel
+        id: deploy
+        run: |
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          echo "Deployed to: $DEPLOYMENT_URL"
+
+      - name: Mark Sentry release as deployed
+        if: success()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: o4510247421018112
+          SENTRY_PROJECT: saaspe-web
+        run: |
+          export SENTRY_RELEASE="${{ github.sha }}"
+          sentry-cli releases deploys "$SENTRY_RELEASE" new -e production
+          echo "Sentry release deployed: $SENTRY_RELEASE"
+
+      - name: Done
+        run: echo "Deployed ${{ github.sha }} to Vercel at ${{ steps.deploy.outputs.url }}"
