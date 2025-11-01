@@ -1,0 +1,99 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'saaspe-web/**'
+      - '.github/workflows/frontend-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'saaspe-web/**'
+
+jobs:
+  lint-and-build:
+    name: Lint, Type Check, and Build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: saaspe-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./saaspe-web
+        run: npm ci
+
+      - name: Run linter
+        working-directory: ./saaspe-web
+        run: npm run lint
+
+      - name: Type check
+        working-directory: ./saaspe-web
+        run: npx tsc --noEmit
+
+      - name: Build application
+        working-directory: ./saaspe-web
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.yourdomain.com
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: saaspe-web/.next
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: saaspe-web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./saaspe-web
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: ./saaspe-web
+        run: npm test -- --coverage
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./saaspe-web/coverage/coverage-final.json
+          flags: frontend
+
+  deploy-vercel:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: [lint-and-build, test]
+    if: github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: ${{ github.ref == 'refs/heads/main' && '--prod' || '' }}

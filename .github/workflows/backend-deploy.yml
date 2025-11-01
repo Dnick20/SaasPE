@@ -1,0 +1,104 @@
+name: Backend Deploy (ECS Fargate)
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'SaasPE-Backend/**'
+      - '.github/workflows/backend-deploy.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}          # e.g. saaspe-backend
+  ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}                # e.g. saaspe-prod
+  ECS_SERVICE: ${{ vars.ECS_SERVICE }}                # e.g. saaspe-backend
+  ECS_TASK_FAMILY: ${{ vars.ECS_TASK_FAMILY }}        # e.g. saaspe-backend
+  CONTAINER_NAME: ${{ vars.CONTAINER_NAME }}          # e.g. backend
+
+jobs:
+  deploy:
+    name: Build, Push, Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: SaasPE-Backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/${ECR_REPOSITORY}:$IMAGE_TAG -f Dockerfile .
+          docker push $ECR_REGISTRY/${ECR_REPOSITORY}:$IMAGE_TAG
+
+      - name: Fetch current task definition
+        env:
+          TASK_FAMILY: ${{ env.ECS_TASK_FAMILY }}
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$TASK_FAMILY" \
+            --query 'taskDefinition' > taskdef.json
+
+      - name: Render new task definition with image
+        env:
+          ECR_REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+        run: |
+          jq --arg IMAGE "$ECR_REGISTRY/${ECR_REPOSITORY}:$IMAGE_TAG" \
+             --arg NAME "$CONTAINER_NAME" \
+             '(.containerDefinitions[] | select(.name==$NAME) | .image) |= $IMAGE | del(.taskDefinitionArn,.revision,.registeredAt,.registeredBy,.status,.requiresAttributes,.compatibilities)' \
+             taskdef.json > new-taskdef.json
+
+      # Optional: run DB migrations as a one-off task (uncomment if needed)
+      # - name: Run migrations (Prisma)
+      #   env:
+      #     CLUSTER: ${{ env.ECS_CLUSTER }}
+      #   run: |
+      #     TD_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+      #     aws ecs run-task \
+      #       --cluster "$CLUSTER" \
+      #       --task-definition "$TD_ARN" \
+      #       --launch-type FARGATE \
+      #       --network-configuration "awsvpcConfiguration={subnets=[SUBNET_1,SUBNET_2],securityGroups=[SG_ID],assignPublicIp=DISABLED}" \
+      #       --overrides '{"containerOverrides":[{"name":"'"$CONTAINER_NAME"'","command":["npm","run","prisma:migrate:deploy"]}]}'
+
+      - name: Register new task definition
+        id: register
+        run: |
+          TD_ARN=$(aws ecs register-task-definition --cli-input-json file://new-taskdef.json --query 'taskDefinition.taskDefinitionArn' --output text)
+          echo "taskdef_arn=$TD_ARN" >> $GITHUB_OUTPUT
+
+      - name: Update service
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE }}
+          TASKDEF_ARN: ${{ steps.register.outputs.taskdef_arn }}
+        run: |
+          aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" --task-definition "$TASKDEF_ARN" --force-new-deployment > /dev/null
+          aws ecs wait services-stable --cluster "$CLUSTER" --services "$SERVICE"
+
+      - name: Done
+        run: echo "Deployed image ${{ github.sha }} to ${{ env.ECS_SERVICE }}"
+
+
