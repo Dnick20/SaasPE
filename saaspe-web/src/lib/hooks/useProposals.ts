@@ -96,8 +96,8 @@ export function useAddPricingOption() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ proposalId, data }: { proposalId: string; data: any }) =>
-      proposalsApi.addPricingOption(proposalId, data),
+    mutationFn: ({ proposalId, data }: { proposalId: string; data: Record<string, unknown> }) =>
+      proposalsApi.addPricingOption(proposalId, data as any),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
     },
@@ -115,7 +115,7 @@ export function useUpdatePricingOption() {
     }: {
       proposalId: string;
       optionId: string;
-      data: any;
+      data: Record<string, unknown>;
     }) => proposalsApi.updatePricingOption(proposalId, optionId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
@@ -146,7 +146,7 @@ export function useAddLineItem() {
     }: {
       proposalId: string;
       optionId: string;
-      data: any;
+      data: Record<string, unknown>;
     }) => proposalsApi.addLineItem(proposalId, optionId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
@@ -167,7 +167,7 @@ export function useUpdateLineItem() {
       proposalId: string;
       optionId: string;
       lineItemId: string;
-      data: any;
+      data: Record<string, unknown>;
     }) => proposalsApi.updateLineItem(proposalId, optionId, lineItemId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
@@ -198,7 +198,7 @@ export function useAddPricingNote() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ proposalId, data }: { proposalId: string; data: any }) =>
+    mutationFn: ({ proposalId, data }: { proposalId: string; data: Record<string, unknown> }) =>
       proposalsApi.addPricingNote(proposalId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
@@ -217,7 +217,7 @@ export function useUpdatePricingNote() {
     }: {
       proposalId: string;
       noteId: string;
-      data: any;
+      data: Record<string, unknown>;
     }) => proposalsApi.updatePricingNote(proposalId, noteId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['proposals', variables.proposalId] });
