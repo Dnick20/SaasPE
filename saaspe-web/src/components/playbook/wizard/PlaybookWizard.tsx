@@ -246,7 +246,7 @@ export function PlaybookWizard({ clientId, clientName, proposalId }: PlaybookWiz
         {currentStep === 'icp' && (
           <ICPDefinitionStep
             data={playbookData.targetICP}
-            onChange={(targetICP) => setPlaybookData({ ...playbookData, targetICP })}
+            onChange={(targetICP) => setPlaybookData({ ...playbookData, targetICP: targetICP as any })}
           />
         )}
 
