@@ -19,14 +19,21 @@ const companySchema = z.object({
 
 type CompanyFormData = z.infer<typeof companySchema>;
 
+interface CompanyProfileData {
+  companyName: string;
+  website?: string;
+  industry?: string;
+  [key: string]: unknown;
+}
+
 interface CompanyProfileStepProps {
-  onComplete: (data: any) => void;
-  initialData?: any;
+  onComplete: (data: CompanyProfileData) => void;
+  initialData?: Partial<CompanyProfileData>;
 }
 
 export function CompanyProfileStep({ onComplete, initialData }: CompanyProfileStepProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [enrichmentData, setEnrichmentData] = useState<any>(null);
+  const [enrichmentData, setEnrichmentData] = useState<Record<string, unknown> | null>(null);
 
   const {
     register,
@@ -48,11 +55,11 @@ export function CompanyProfileStep({ onComplete, initialData }: CompanyProfileSt
     try {
       const response = await companyProfileApi.analyzeWebsite(website);
       const data = response.data;
-      setEnrichmentData(data);
+      setEnrichmentData(data as any);
 
       // Auto-fill industry if available
       if (data.industry && !watch('industry')) {
-        setValue('industry', data.industry);
+        setValue('industry', data.industry as string);
       }
     } catch (error) {
       console.error('Failed to analyze website:', error);
