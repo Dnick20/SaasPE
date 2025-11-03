@@ -28,11 +28,6 @@ function AnalyticsTracker() {
 export default function GoogleAnalytics() {
   const GA_MEASUREMENT_ID = 'G-YQ3487YF0T'
 
-  // Only load in production
-  if (process.env.NODE_ENV !== 'production') {
-    return null
-  }
-
   return (
     <>
       <Script
