@@ -1,0 +1,212 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Proposal Pricing Generation Schema",
+  "description": "JSON schema for validating AI-generated pricing options with narrative structure",
+  "type": "object",
+  "required": ["options"],
+  "properties": {
+    "options": {
+      "type": "array",
+      "description": "Array of pricing options (typically 1-3 options)",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/definitions/pricingOption"
+      }
+    }
+  },
+  "definitions": {
+    "pricingOption": {
+      "type": "object",
+      "required": ["label", "billingCadence", "summary", "coreServices"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Option label/name",
+          "minLength": 5,
+          "maxLength": 100,
+          "examples": ["Option A: Diagnostic Sprint", "Option B: Monthly Retainer"]
+        },
+        "billingCadence": {
+          "type": "string",
+          "enum": ["fixed_fee", "monthly_retainer", "hourly"],
+          "description": "Billing model for this option"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Narrative paragraph explaining the option (min 50 chars)",
+          "minLength": 50,
+          "maxLength": 1000
+        },
+        "tierType": {
+          "type": "string",
+          "enum": ["single", "tiered", null],
+          "description": "Whether this option has tiered pricing",
+          "default": "single"
+        },
+        "coreServices": {
+          "type": "array",
+          "description": "Core service line items",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/lineItem"
+          }
+        },
+        "addons": {
+          "type": "array",
+          "description": "Optional add-on services",
+          "items": {
+            "$ref": "#/definitions/lineItem"
+          },
+          "default": []
+        },
+        "tierDefinitions": {
+          "type": "array",
+          "description": "Tier definitions for tiered pricing (e.g., Data Only vs Data + Leads)",
+          "items": {
+            "$ref": "#/definitions/tierDefinition"
+          },
+          "default": []
+        },
+        "thirdPartyCosts": {
+          "type": "array",
+          "description": "Third-party costs requiring client approval",
+          "items": {
+            "$ref": "#/definitions/thirdPartyCost"
+          },
+          "default": []
+        },
+        "paymentTerms": {
+          "type": "string",
+          "description": "Payment terms (e.g., 'Net 30, ACH preferred')",
+          "minLength": 10,
+          "maxLength": 500,
+          "examples": ["Net 30, ACH or wire transfer preferred", "50% upfront, 50% upon completion"]
+        },
+        "cancellationNotice": {
+          "type": "string",
+          "description": "Cancellation notice requirements",
+          "minLength": 10,
+          "maxLength": 500,
+          "examples": ["30-day notice required", "N/A (fixed engagement)"]
+        },
+        "isRecommended": {
+          "type": "boolean",
+          "description": "Mark this option as recommended",
+          "default": false
+        }
+      }
+    },
+    "lineItem": {
+      "type": "object",
+      "required": ["description", "amount", "unitType"],
+      "properties": {
+        "lineType": {
+          "type": "string",
+          "enum": ["core", "tier", "addon", "thirdParty"],
+          "description": "Type of line item",
+          "default": "core"
+        },
+        "description": {
+          "type": "string",
+          "description": "Narrative bullet description (min 20 chars for clarity)",
+          "minLength": 20,
+          "maxLength": 500,
+          "examples": [
+            "Twenty Hour Diagnostic Sprint • Fixed fee for one month, up to twenty hours",
+            "Month to Month Retainer • $4,000/month (includes data enrichment and lead generation)"
+          ]
+        },
+        "amount": {
+          "type": "number",
+          "description": "Price in USD",
+          "minimum": 0,
+          "examples": [2000, 4000, 150]
+        },
+        "unitType": {
+          "type": "string",
+          "enum": ["fixed", "hourly", "monthly"],
+          "description": "Unit type for pricing"
+        },
+        "hoursIncluded": {
+          "type": "integer",
+          "description": "Number of hours included (if applicable)",
+          "minimum": 1,
+          "examples": [20, 40, 80]
+        },
+        "requiresApproval": {
+          "type": "boolean",
+          "description": "Whether this line item requires client approval",
+          "default": false
+        },
+        "notes": {
+          "type": "string",
+          "description": "Additional notes about this line item",
+          "maxLength": 500,
+          "examples": ["Unused hours do not roll over", "Billed in arrears"]
+        }
+      }
+    },
+    "tierDefinition": {
+      "type": "object",
+      "required": ["name", "description", "amount"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Tier name",
+          "minLength": 3,
+          "maxLength": 100,
+          "examples": ["Data Only", "Data + Leads", "Enterprise"]
+        },
+        "description": {
+          "type": "string",
+          "description": "What's included in this tier",
+          "minLength": 20,
+          "maxLength": 500,
+          "examples": ["Data enrichment only (up to 5,000 contacts/month)"]
+        },
+        "amount": {
+          "type": "number",
+          "description": "Price for this tier",
+          "minimum": 0
+        },
+        "features": {
+          "type": "array",
+          "description": "List of features included in this tier",
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "thirdPartyCost": {
+      "type": "object",
+      "required": ["description", "estimatedAmount"],
+      "properties": {
+        "description": {
+          "type": "string",
+          "description": "What the third-party cost is for",
+          "minLength": 20,
+          "maxLength": 500,
+          "examples": ["Clay.com subscription ($800/month, billed directly to client)"]
+        },
+        "estimatedAmount": {
+          "type": "number",
+          "description": "Estimated cost in USD",
+          "minimum": 0
+        },
+        "requiresApproval": {
+          "type": "boolean",
+          "description": "Requires explicit client approval",
+          "default": true
+        },
+        "billingMethod": {
+          "type": "string",
+          "description": "How this cost is billed",
+          "examples": ["Billed directly to client", "Pass-through billing", "Included in monthly retainer"]
+        }
+      }
+    }
+  }
+}

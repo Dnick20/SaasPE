@@ -1,0 +1,383 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { Logger, UseGuards } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+
+interface PresenceInfo {
+  userId: string;
+  email: string;
+  resourceType: 'proposal' | 'client' | 'transcription' | 'campaign';
+  resourceId: string;
+  joinedAt: Date;
+}
+
+/**
+ * Real-time Collaboration Gateway
+ *
+ * Features:
+ * - Live presence tracking (see who's viewing what)
+ * - Real-time notifications
+ * - Live updates when resources are modified
+ * - Collaborative editing indicators
+ *
+ * WebSocket Events:
+ * - join_resource - Join a resource room (proposal, client, etc.)
+ * - leave_resource - Leave a resource room
+ * - resource_updated - Broadcast when resource is modified
+ * - typing - Show typing indicators
+ * - cursor_move - Show cursor position (for collaborative editing)
+ */
+@WebSocketGateway({
+  cors: {
+    origin: '*', // Configure based on your frontend URL
+    credentials: true,
+  },
+  namespace: '/collaboration',
+})
+export class CollaborationGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer()
+  server: Server;
+
+  private readonly logger = new Logger(CollaborationGateway.name);
+  private presence: Map<string, PresenceInfo[]> = new Map(); // resourceId → users viewing
+  private userSockets: Map<string, string[]> = new Map(); // userId → socketIds
+
+  constructor(private jwtService: JwtService) {}
+
+  /**
+   * Handle new WebSocket connection
+   */
+  async handleConnection(client: Socket) {
+    try {
+      // Authenticate via JWT token
+      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+
+      if (!token) {
+        this.logger.warn(`Connection rejected - no token provided`);
+        client.disconnect();
+        return;
+      }
+
+      const payload = this.jwtService.verify(token);
+      client.data.user = payload;
+
+      // Track user socket
+      if (!this.userSockets.has(payload.sub)) {
+        this.userSockets.set(payload.sub, []);
+      }
+      this.userSockets.get(payload.sub)!.push(client.id);
+
+      this.logger.log(
+        `Client connected: ${client.id} (User: ${payload.email})`,
+      );
+
+      // Send connection success
+      client.emit('connected', {
+        userId: payload.sub,
+        email: payload.email,
+      });
+    } catch (error) {
+      this.logger.error(`Authentication failed: ${error.message}`);
+      client.disconnect();
+    }
+  }
+
+  /**
+   * Handle WebSocket disconnection
+   */
+  handleDisconnect(client: Socket) {
+    const user = client.data.user;
+
+    if (user) {
+      // Remove from user sockets
+      const sockets = this.userSockets.get(user.sub) || [];
+      const index = sockets.indexOf(client.id);
+      if (index !== -1) {
+        sockets.splice(index, 1);
+      }
+
+      // Remove from all resource presence
+      for (const [resourceId, users] of this.presence.entries()) {
+        const userIndex = users.findIndex((u) => u.userId === user.sub);
+        if (userIndex !== -1) {
+          users.splice(userIndex, 1);
+
+          // Notify others
+          this.server
+            .to(`resource:${resourceId}`)
+            .emit('user_left', {
+              resourceId,
+              userId: user.sub,
+              email: user.email,
+            });
+        }
+      }
+
+      this.logger.log(`Client disconnected: ${client.id} (User: ${user.email})`);
+    }
+  }
+
+  /**
+   * Join a resource room (proposal, client, etc.)
+   */
+  @SubscribeMessage('join_resource')
+  handleJoinResource(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      resourceType: 'proposal' | 'client' | 'transcription' | 'campaign';
+      resourceId: string;
+    },
+  ) {
+    const user = client.data.user;
+    const roomName = `resource:${data.resourceId}`;
+
+    // Join Socket.IO room
+    client.join(roomName);
+
+    // Track presence
+    if (!this.presence.has(data.resourceId)) {
+      this.presence.set(data.resourceId, []);
+    }
+
+    const presenceInfo: PresenceInfo = {
+      userId: user.sub,
+      email: user.email,
+      resourceType: data.resourceType,
+      resourceId: data.resourceId,
+      joinedAt: new Date(),
+    };
+
+    this.presence.get(data.resourceId)!.push(presenceInfo);
+
+    // Get all current users viewing this resource
+    const currentUsers = this.presence.get(data.resourceId) || [];
+
+    this.logger.log(
+      `User ${user.email} joined ${data.resourceType} ${data.resourceId}`,
+    );
+
+    // Notify user about current viewers
+    client.emit('presence_update', {
+      resourceId: data.resourceId,
+      users: currentUsers.map((u) => ({
+        userId: u.userId,
+        email: u.email,
+        joinedAt: u.joinedAt,
+      })),
+    });
+
+    // Notify others in the room
+    client.to(roomName).emit('user_joined', {
+      resourceId: data.resourceId,
+      userId: user.sub,
+      email: user.email,
+    });
+
+    return {
+      success: true,
+      currentUsers: currentUsers.length,
+    };
+  }
+
+  /**
+   * Leave a resource room
+   */
+  @SubscribeMessage('leave_resource')
+  handleLeaveResource(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { resourceId: string },
+  ) {
+    const user = client.data.user;
+    const roomName = `resource:${data.resourceId}`;
+
+    client.leave(roomName);
+
+    // Remove from presence
+    if (this.presence.has(data.resourceId)) {
+      const users = this.presence.get(data.resourceId)!;
+      const index = users.findIndex((u) => u.userId === user.sub);
+
+      if (index !== -1) {
+        users.splice(index, 1);
+      }
+    }
+
+    // Notify others
+    client.to(roomName).emit('user_left', {
+      resourceId: data.resourceId,
+      userId: user.sub,
+      email: user.email,
+    });
+
+    this.logger.log(`User ${user.email} left resource ${data.resourceId}`);
+
+    return { success: true };
+  }
+
+  /**
+   * Broadcast resource update to all viewers
+   */
+  @SubscribeMessage('resource_updated')
+  handleResourceUpdate(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      resourceType: string;
+      resourceId: string;
+      updateType: string; // 'field_changed', 'status_changed', etc.
+      field?: string;
+      value?: any;
+      userId: string;
+    },
+  ) {
+    const roomName = `resource:${data.resourceId}`;
+
+    // Broadcast to all users in the room except sender
+    client.to(roomName).emit('live_update', {
+      resourceType: data.resourceType,
+      resourceId: data.resourceId,
+      updateType: data.updateType,
+      field: data.field,
+      value: data.value,
+      userId: data.userId,
+      timestamp: new Date(),
+    });
+
+    this.logger.debug(
+      `Resource update broadcast: ${data.resourceType} ${data.resourceId}`,
+    );
+
+    return { success: true };
+  }
+
+  /**
+   * Typing indicator (for collaborative editing)
+   */
+  @SubscribeMessage('typing')
+  handleTyping(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      resourceId: string;
+      field: string; // which field user is typing in
+      isTyping: boolean;
+    },
+  ) {
+    const user = client.data.user;
+    const roomName = `resource:${data.resourceId}`;
+
+    client.to(roomName).emit('user_typing', {
+      resourceId: data.resourceId,
+      field: data.field,
+      userId: user.sub,
+      email: user.email,
+      isTyping: data.isTyping,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Cursor position (for collaborative editing)
+   */
+  @SubscribeMessage('cursor_move')
+  handleCursorMove(
+    @ConnectedSocket() client: Socket,
+    @MessageBody()
+    data: {
+      resourceId: string;
+      field: string;
+      position: number; // Cursor position in text
+    },
+  ) {
+    const user = client.data.user;
+    const roomName = `resource:${data.resourceId}`;
+
+    client.to(roomName).emit('cursor_update', {
+      resourceId: data.resourceId,
+      field: data.field,
+      userId: user.sub,
+      email: user.email,
+      position: data.position,
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * Send notification to specific user
+   */
+  notifyUser(userId: string, event: string, data: any) {
+    const socketIds = this.userSockets.get(userId) || [];
+
+    socketIds.forEach((socketId) => {
+      this.server.to(socketId).emit(event, data);
+    });
+
+    this.logger.debug(`Notification sent to user ${userId}: ${event}`);
+  }
+
+  /**
+   * Send notification to all users in a tenant
+   */
+  notifyTenant(tenantId: string, event: string, data: any) {
+    // Broadcast to all connected users (filtered by tenant on client side)
+    this.server.emit(event, {
+      ...data,
+      tenantId,
+    });
+
+    this.logger.debug(`Tenant notification sent: ${event}`);
+  }
+
+  /**
+   * Broadcast resource update from server-side
+   * (Called by other services when data changes)
+   */
+  broadcastResourceUpdate(
+    resourceId: string,
+    resourceType: string,
+    updateType: string,
+    data: any,
+  ) {
+    const roomName = `resource:${resourceId}`;
+
+    this.server.to(roomName).emit('live_update', {
+      resourceType,
+      resourceId,
+      updateType,
+      data,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Server-side update broadcast: ${resourceType} ${resourceId}`,
+    );
+  }
+
+  /**
+   * Get current viewers for a resource
+   */
+  getResourceViewers(resourceId: string): PresenceInfo[] {
+    return this.presence.get(resourceId) || [];
+  }
+
+  /**
+   * Check if user is online
+   */
+  isUserOnline(userId: string): boolean {
+    const sockets = this.userSockets.get(userId) || [];
+    return sockets.length > 0;
+  }
+}
