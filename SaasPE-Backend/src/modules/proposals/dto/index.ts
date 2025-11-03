@@ -11,3 +11,8 @@ export * from './pricing-v2.dto';
 export * from './generate-ai-proposal.dto';
 export * from './update-proposal-sections.dto';
 export * from './update-proposal-pricing.dto';
+
+// Phase 1: Personalized Learning DTOs
+export * from './submit-feedback.dto';
+export * from './track-edit.dto';
+export * from './learning-profile.dto';

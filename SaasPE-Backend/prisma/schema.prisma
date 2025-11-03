@@ -1512,6 +1512,7 @@ model AIGenerationFeedback {
   id       String @id @default(uuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String? // User who provided feedback
 
   // What was generated
   generationType  String // "proposal", "email", "summary", "key_moments"
@@ -1527,6 +1528,14 @@ model AIGenerationFeedback {
   feedback      String? @db.Text // User comments
   outcome       String? // "won_deal", "lost_deal", "no_response", "unclear"
 
+  // Enhanced Feedback (Personalized Learning V2)
+  detailedRatings      Json? // Multi-dimensional: { accuracy, tone, length, specificity, persuasiveness, structure }
+  categoricalFeedback  String[] @default([]) // Quick tags: ["too_generic", "wrong_tone", "missing_details"]
+  editPatterns         Json? // Extracted patterns: [{ type, category, examples, impact }]
+  feedbackWeight       Float? // Quality-based weight (0-5.0)
+  validationScore      Float? // Feedback validation confidence (0-1)
+  validationWarnings   String[] @default([]) // ["high_rating_but_heavy_edits"]
+
   // Context for learning
   inputContext Json // Transcript data, client info, etc.
   wonDeal      Boolean? // Did this lead to a won deal?
@@ -1538,6 +1547,7 @@ model AIGenerationFeedback {
   @@index([tenantId, generationType])
   @@index([outcome])
   @@index([wonDeal])
+  @@index([userId])
 }
 
 model AIAuditLog {
@@ -1576,6 +1586,111 @@ model AIErrorPattern {
   updated DateTime @updatedAt
 
   @@index([errorType])
+}
+
+// ============================================================================
+// PERSONALIZED AI LEARNING SYSTEM
+// ============================================================================
+
+model UserLearningPreferences {
+  id       String @id @default(uuid())
+  userId   String @unique
+  tenantId String
+
+  // Learned Preferences (from feedback & edit patterns)
+  preferredTone   String? // "professional" | "casual" | "consultative" | "friendly"
+  preferredLength String? // "concise" | "detailed" | "comprehensive"
+
+  // Edit Patterns (aggregated from ProposalEditTracking)
+  topEditPatterns   Json? // Top 10 most frequent patterns: [{ type, category, frequency, examples }]
+  commonStrengths   Json? // Sections consistently rated high or left unedited
+  commonWeaknesses  Json? // Sections needing improvement
+  avoidPatterns     String[] @default([]) // Things user consistently removes
+  emphasizePatterns String[] @default([]) // Things user consistently adds
+
+  // Industry-Specific Preferences
+  industryPreferences Json? // Grouped by industry: { "SaaS": { tone, patterns }, "Healthcare": {...} }
+
+  // Metadata
+  sampleSize      Int   @default(0) // Number of feedback items used
+  confidenceScore Float @default(0.0) // How confident we are in the profile (0-1)
+  lastUpdated     DateTime @updatedAt
+
+  // Privacy Controls
+  enablePersonalization Boolean @default(true)
+  shareForGlobalLearning Boolean @default(false) // Opt-in for anonymized aggregation
+
+  // Timestamps
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([confidenceScore])
+}
+
+model ProposalEditTracking {
+  id          String @id @default(uuid())
+  proposalId  String
+  userId      String
+  tenantId    String
+  section     String // "executiveSummary", "scopeOfWork", "pricing", etc.
+
+  // Edit Details
+  originalText String @db.Text
+  editedText   String @db.Text
+  editType     String // "addition" | "deletion" | "tone_shift" | "length_change" | "replacement"
+  editCategory String? // "adds_metrics" | "removes_jargon" | "more_formal" | "more_specific"
+
+  // Edit Magnitude
+  editDistance Int? // Levenshtein distance
+  editMagnitude Float? // Percentage of content changed (0-1)
+
+  // AI Analysis (optional - can be computed async)
+  aiAnalysis Json? // { reason: "...", pattern: "...", recommendation: "..." }
+
+  // Context
+  clientIndustry String?
+  proposalType   String? // "new_business" | "renewal" | "expansion"
+
+  // Metadata
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([proposalId])
+  @@index([section])
+  @@index([editCategory])
+}
+
+// ============================================================================
+// AI COST TRACKING (Phase 2 Multi-Pass Enhancement)
+// ============================================================================
+
+model AICostLog {
+  id         String   @id @default(uuid())
+  proposalId String
+  tenantId   String
+  phase      Int // 1 or 2 (Phase 1 vs Phase 2 multi-pass)
+  model      String // "gpt-4o-mini" | "gpt-4o" | "gpt-4-turbo"
+  operation  String // "entity_extraction" | "section_drafting" | "gap_filling" | "proposal_generation"
+
+  // Token Usage
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+
+  // Cost
+  cost Float // USD
+
+  // Metadata
+  metadata  Json? // Additional context: { confidence, duration, passNumber, etc. }
+  timestamp DateTime @default(now())
+
+  @@index([tenantId, timestamp])
+  @@index([proposalId])
+  @@index([phase])
+  @@index([tenantId, phase, timestamp]) // For cost analysis queries
 }
 
 // ============================================================================

@@ -24,6 +24,11 @@ import { ProposalContextBuilderService } from './services/proposal-context-build
 import { PricingTemplateService } from './services/pricing-template.service';
 import { ProposalAutofillService } from './services/proposal-autofill.service';
 
+// Phase 1: Personalized Learning Services
+import { EditTrackingService } from '../../shared/services/edit-tracking.service';
+import { FeedbackValidationService } from '../../shared/services/feedback-validation.service';
+import { PatternExtractionService } from '../../shared/services/pattern-extraction.service';
+
 /**
  * Proposals Module
  *
@@ -74,6 +79,10 @@ import { ProposalAutofillService } from './services/proposal-autofill.service';
     WordExporterService,
     ESignatureProviderFactory,
     ESignatureConnectionsService,
+    // Phase 1: Personalized Learning
+    EditTrackingService,
+    FeedbackValidationService,
+    PatternExtractionService,
   ],
   exports: [ProposalsService],
 })

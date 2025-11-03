@@ -21,6 +21,10 @@ import { ProposalContextBuilderService } from './services/proposal-context-build
 import { GoogleOAuthService } from '../../shared/services/google/google-oauth.service';
 import { GDocsExporterService } from '../../shared/services/google/gdocs-exporter.service';
 import { WordExporterService } from '../../shared/services/word-exporter.service';
+// Phase 1: Personalized Learning Services
+import { EditTrackingService } from '../../shared/services/edit-tracking.service';
+import { FeedbackValidationService } from '../../shared/services/feedback-validation.service';
+import { PatternExtractionService } from '../../shared/services/pattern-extraction.service';
 import {
   CreateProposalDto,
   UpdateProposalDto,
@@ -35,6 +39,14 @@ import {
   CreateProposalFromTranscriptionDto,
   GenerateAIProposalDto,
   UpdateProposalPricingDto,
+  // Phase 1: Personalized Learning DTOs
+  SubmitFeedbackDto,
+  SubmitFeedbackResponseDto,
+  TrackEditDto,
+  TrackEditResponseDto,
+  LearningProfileResponseDto,
+  EditStatsResponseDto,
+  TenantProfileStatsResponseDto,
 } from './dto';
 import {
   PROPOSAL_GENERATE_JOB,
@@ -73,6 +85,10 @@ export class ProposalsService {
     private wordExporterService: WordExporterService,
     private proposalContextBuilder: ProposalContextBuilderService,
     @InjectQueue('proposal') private proposalQueue: Queue,
+    // Phase 1: Personalized Learning Services
+    private editTrackingService: EditTrackingService,
+    private feedbackValidationService: FeedbackValidationService,
+    private patternExtractionService: PatternExtractionService,
   ) {}
 
   /**
