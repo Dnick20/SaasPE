@@ -39,9 +39,9 @@ export function DiscoveryWizardModular() {
       // Mark discovery step complete
       markStepComplete('discovery', {
         companyProfileId: profile.data.id,
-        companyName: companyData.companyName as string,
-        website: companyData.website as string | undefined,
-        industry: companyData.industry as string | undefined,
+        companyName: companyData!.companyName as string,
+        website: companyData!.website as string | undefined,
+        industry: companyData!.industry as string | undefined,
         targetICP: icpData.targetICP as any,
         preferredTone: icpData.preferredTone as string | undefined,
       });
