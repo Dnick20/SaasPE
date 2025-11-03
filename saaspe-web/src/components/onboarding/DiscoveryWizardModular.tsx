@@ -76,7 +76,7 @@ export function DiscoveryWizardModular() {
 
       {/* Steps */}
       {currentStep === 'company' && (
-        <CompanyProfileStep onComplete={handleCompanyComplete} initialData={companyData} />
+        <CompanyProfileStep onComplete={handleCompanyComplete} initialData={companyData ?? undefined} />
       )}
       {currentStep === 'icp' && (
         <ICPDefinitionStep onComplete={handleICPComplete} />
