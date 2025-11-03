@@ -139,7 +139,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
             cancellationNotice: (document.getElementById('cancellationNotice') as HTMLTextAreaElement)?.value,
             timeline: Array.isArray(timelineValue) ? timelineValue : timelinePhases,
           };
-          await proposalsApi.updateSections(proposal.id, payload);
+          await proposalsApi.updateSections(proposal.id, payload as any);
           toast.success('Saved');
         } catch (e) {
           // Non-blocking toast
@@ -233,8 +233,8 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       const pdfUrl = `/api/v1/proposals/${proposal.id}/pdf`;
 
       // Generate filename from proposal data
-      const clientName = proposal.client?.companyName || 'Client';
-      const proposalTitle = proposal.title || 'Proposal';
+      const clientName = (proposal.client as any)?.companyName || 'Client';
+      const proposalTitle = (proposal.title as string) || 'Proposal';
       const filename = `${clientName.replace(/[^a-zA-Z0-9]/g, '-')}-${proposalTitle.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
 
       // Download PDF as Blob
@@ -330,8 +330,8 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       a.href = url;
 
       // Generate filename
-      const clientName = proposal.client?.companyName || 'Client';
-      const proposalTitle = proposal.title || 'Proposal';
+      const clientName = (proposal.client as any)?.companyName || 'Client';
+      const proposalTitle = (proposal.title as string) || 'Proposal';
       a.download = `${clientName.replace(/[^a-zA-Z0-9]/g, '-')}-${proposalTitle.replace(/[^a-zA-Z0-9]/g, '-')}.docx`;
 
       document.body.appendChild(a);
@@ -495,7 +495,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
             </div>
             <div className="flex items-center gap-2">
               {/* Auto-Fill Button - Only show if proposal has linked transcription */}
-              {proposal.transcriptionId && (
+              {proposal.transcriptionId ? (
                 <>
                   <Button
                     type="button"
@@ -514,7 +514,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   </Button>
                   <div className="h-6 w-px bg-gray-300 mx-1" />
                 </>
-              )}
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
