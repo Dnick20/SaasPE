@@ -557,7 +557,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                 )}
                 Export Word
               </Button>
-              {proposal.gdocId && (
+              {proposal.gdocId ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -568,8 +568,8 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   <Download className="h-4 w-4 mr-2" />
                   Refresh GDoc
                 </Button>
-              )}
-              {proposal.gdocId && (
+              ) : null}
+              {proposal.gdocId ? (
                 <Button
                   type="button"
                   variant="outline"
@@ -580,7 +580,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   <Download className="h-4 w-4 mr-2" />
                   Import from GDoc
                 </Button>
-              )}
+              ) : null}
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
@@ -599,7 +599,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                     <AlertDialogTitle>Delete Proposal?</AlertDialogTitle>
                     <AlertDialogDescription>
                       This action cannot be undone. This will permanently delete the proposal
-                      &quot;{proposal.title}&quot; and all associated data.
+                      &quot;{proposal.title as string}&quot; and all associated data.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
@@ -723,13 +723,13 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm font-medium text-blue-900 mb-1">Client</p>
                   <p className="text-lg font-semibold text-blue-700">
-                    {proposal.client?.companyName || 'N/A'}
+                    {(proposal.client as any)?.companyName || 'N/A'}
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 rounded-lg">
                   <p className="text-sm font-medium text-green-900 mb-1">Created</p>
                   <p className="text-lg font-semibold text-green-700">
-                    {new Date(proposal.created).toLocaleDateString()}
+                    {new Date(proposal.created as string).toLocaleDateString()}
                   </p>
                 </div>
               </div>
