@@ -253,7 +253,7 @@ export function PlaybookWizard({ clientId, clientName, proposalId }: PlaybookWiz
         {currentStep === 'generate' && (
           <ScriptGenerationStep
             data={playbookData}
-            onChange={(data) => setPlaybookData({ ...playbookData, ...data })}
+            onChange={(data) => setPlaybookData({ ...playbookData, ...data } as any)}
             onGenerateScripts={handleGenerateScripts}
             isGenerating={isGenerating}
             hasGenerated={hasGenerated}
@@ -263,7 +263,7 @@ export function PlaybookWizard({ clientId, clientName, proposalId }: PlaybookWiz
         {currentStep === 'review' && (
           <ReviewScriptsStep
             data={playbookData}
-            onChange={(data) => setPlaybookData({ ...playbookData, ...data })}
+            onChange={(data) => setPlaybookData({ ...playbookData, ...data } as any)}
           />
         )}
 
