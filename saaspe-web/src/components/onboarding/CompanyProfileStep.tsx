@@ -134,7 +134,7 @@ export function CompanyProfileStep({ onComplete, initialData }: CompanyProfileSt
             <div className="p-4 bg-green-50 rounded-lg space-y-2">
               <p className="text-sm font-medium text-green-900">Website Analysis Complete!</p>
               <p className="text-sm text-green-700">{enrichmentData.description as string}</p>
-              {enrichmentData.services && (
+              {Array.isArray(enrichmentData.services) && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {(enrichmentData.services as string[]).map((service: string, i: number) => (
                     <span key={i} className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
