@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { OpenAIService } from '../../../shared/services/openai.service';
+import { ConfidenceScoringService, SectionQuality } from '../../../shared/services/confidence-scoring.service';
 import {
   SectionContext,
   getExtractionPrompt,
@@ -30,6 +31,7 @@ export class ProposalAutofillService {
   constructor(
     private prisma: PrismaService,
     private openai: OpenAIService,
+    private confidenceScoring: ConfidenceScoringService,
   ) {}
 
   /**
@@ -127,8 +129,61 @@ export class ProposalAutofillService {
       this.generateCancellationNotice(context, extractedInsights),
     ]);
 
-    // STEP 3: Update proposal with generated content
-    this.logger.log('Step 3: Updating proposal with generated content');
+    // STEP 3: Extract confidence data from all responses
+    this.logger.log('Step 3: Extracting confidence scores from AI responses');
+    const sectionQualities: SectionQuality[] = [];
+
+    // Extract confidence from each section response
+    const overviewQuality = this.confidenceScoring.extractConfidenceFromResponse(overview, 'overview');
+    if (overviewQuality) sectionQualities.push(overviewQuality);
+
+    const execSummaryQuality = this.confidenceScoring.extractConfidenceFromResponse(executiveSummary, 'executiveSummary');
+    if (execSummaryQuality) sectionQualities.push(execSummaryQuality);
+
+    const objectivesQuality = this.confidenceScoring.extractConfidenceFromResponse(objectivesAndOutcomes, 'objectivesAndOutcomes');
+    if (objectivesQuality) sectionQualities.push(objectivesQuality);
+
+    const scopeOfWorkQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeOfWork, 'scopeOfWork');
+    if (scopeOfWorkQuality) sectionQualities.push(scopeOfWorkQuality);
+
+    const deliverablesQuality = this.confidenceScoring.extractConfidenceFromResponse(deliverables, 'deliverables');
+    if (deliverablesQuality) sectionQualities.push(deliverablesQuality);
+
+    const approachQuality = this.confidenceScoring.extractConfidenceFromResponse(approachAndTools, 'approachAndTools');
+    if (approachQuality) sectionQualities.push(approachQuality);
+
+    const timelineQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeAndTimeline, 'timeline');
+    if (timelineQuality) sectionQualities.push(timelineQuality);
+
+    const pricingQuality = this.confidenceScoring.extractConfidenceFromResponse(pricing, 'pricing');
+    if (pricingQuality) sectionQualities.push(pricingQuality);
+
+    const paymentTermsQuality = this.confidenceScoring.extractConfidenceFromResponse(paymentTerms, 'paymentTerms');
+    if (paymentTermsQuality) sectionQualities.push(paymentTermsQuality);
+
+    const cancellationQuality = this.confidenceScoring.extractConfidenceFromResponse(cancellationNotice, 'cancellationNotice');
+    if (cancellationQuality) sectionQualities.push(cancellationQuality);
+
+    const extractionQuality = this.confidenceScoring.extractConfidenceFromResponse(extractedInsights, 'extraction');
+    if (extractionQuality) sectionQualities.push(extractionQuality);
+
+    // STEP 4: Calculate overall quality metrics
+    this.logger.log('Step 4: Calculating proposal quality metrics');
+    const qualityMetrics = this.confidenceScoring.calculateProposalMetrics(sectionQualities);
+
+    // Log quality report
+    const qualityReport = this.confidenceScoring.generateQualityReport(qualityMetrics);
+    this.logger.log(`Quality Report:\n${qualityReport}`);
+
+    // Warn if validation failed
+    if (!qualityMetrics.validationPassed) {
+      this.logger.warn(
+        `Proposal ${proposalId} has low quality scores. Coverage: ${(qualityMetrics.coverageScore * 100).toFixed(0)}%, Overall: ${(qualityMetrics.overallConfidence * 100).toFixed(0)}%`,
+      );
+    }
+
+    // STEP 5: Update proposal with generated content and quality metrics
+    this.logger.log('Step 5: Updating proposal with generated content and quality metrics');
     const updatedProposal = await this.prisma.proposal.update({
       where: { id: proposalId },
       data: {
@@ -144,6 +199,25 @@ export class ProposalAutofillService {
         cancellationNotice: cancellationNotice.cancellationNotice,
         generationMethod: 'ai_autofill',
         aiModel: 'gpt-4o + gpt-4o-mini',
+        // IR v2.0.31 Quality Tracking
+        confidenceScores: qualityMetrics.sectionScores as any,
+        validationResults: {
+          validationPassed: qualityMetrics.validationPassed,
+          overallConfidence: qualityMetrics.overallConfidence,
+          coverageScore: qualityMetrics.coverageScore,
+          dataAvailabilityScore: qualityMetrics.dataAvailabilityScore,
+          lowConfidenceSections: qualityMetrics.lowConfidenceSections,
+          flaggedForReview: qualityMetrics.flaggedForReview,
+          timestamp: new Date().toISOString(),
+        } as any,
+        aiGenerationMetadata: {
+          model: 'gpt-4o + gpt-4o-mini',
+          extractionModel: 'gpt-4o-mini',
+          generationModel: 'gpt-4o',
+          sectionsGenerated: sectionQualities.length,
+          timestamp: new Date().toISOString(),
+          irVersion: 'v2.0.31',
+        } as any,
       },
       include: {
         client: true,
@@ -152,7 +226,12 @@ export class ProposalAutofillService {
     });
 
     this.logger.log(`Auto-fill complete for proposal ${proposalId}`);
-    return updatedProposal;
+
+    // Include quality metrics in response for UI display
+    return {
+      ...updatedProposal,
+      qualityMetrics,
+    };
   }
 
   /**

@@ -418,6 +418,12 @@ model Proposal {
   aiCompletionTokens Int?
   aiCost             Float?
 
+  // IR v2.0.31: Quality & Confidence Tracking
+  confidenceScores     Json? // Per-section confidence: { executiveSummary: { overall: 0.85, dataAvailability: 0.9, ... }, ... }
+  sourceTracking       Json? // Evidence chains: { claims: [{ text: "...", sources: [{ type, timestamp, quote, confidence }] }] }
+  validationResults    Json? // Quality checks: { contradictions: [], completeness: 0.9, coherence: 0.85, hallucinations: [] }
+  aiGenerationMetadata Json? // Generation tracking: { passes: [{ type, model, timestamp, tokensUsed }], refinements: [], totalPasses: 4 }
+
   created DateTime  @default(now())
   updated DateTime  @updatedAt
   sentAt  DateTime?

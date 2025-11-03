@@ -9,6 +9,7 @@ import { CloudflareDNSService } from './cloudflare.service';
 import { RegistrarService } from './registrar.service';
 import { SesManagementService } from './ses-management.service';
 import { WordExporterService } from './word-exporter.service';
+import { ConfidenceScoringService } from './confidence-scoring.service';
 
 /**
  * Shared Services Module
@@ -41,6 +42,7 @@ import { WordExporterService } from './word-exporter.service';
     RegistrarService,
     SesManagementService,
     WordExporterService,
+    ConfidenceScoringService,
   ],
   exports: [
     EncryptionService,
@@ -52,6 +54,7 @@ import { WordExporterService } from './word-exporter.service';
     RegistrarService,
     SesManagementService,
     WordExporterService,
+    ConfidenceScoringService,
   ],
 })
 export class ServicesModule {}
