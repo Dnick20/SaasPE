@@ -74,7 +74,11 @@ const proposalSchema = z.object({
 type ProposalFormData = z.infer<typeof proposalSchema>;
 
 interface ProposalEditorProps {
-  proposal: any;
+  proposal: {
+    id: string;
+    status: string;
+    [key: string]: unknown;
+  };
 }
 
 export function ProposalEditor({ proposal }: ProposalEditorProps) {
@@ -101,15 +105,15 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
   } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
     defaultValues: {
-      title: proposal.title || '',
-      executiveSummary: proposal.executiveSummary || '',
-      objectivesAndOutcomes: proposal.objectivesAndOutcomes || '',
-      scopeOfWork: proposal.scopeOfWork || '',
-      deliverables: proposal.deliverables || '',
-      approachAndTools: proposal.approachAndTools || '',
-      paymentTerms: proposal.paymentTerms || '',
-      cancellationNotice: proposal.cancellationNotice || '',
-      timeline: Array.isArray(proposal.timeline) ? proposal.timeline : (proposal.timeline || ''),
+      title: (proposal.title as string) || '',
+      executiveSummary: (proposal.executiveSummary as string) || '',
+      objectivesAndOutcomes: (proposal.objectivesAndOutcomes as string) || '',
+      scopeOfWork: (proposal.scopeOfWork as string) || '',
+      deliverables: (proposal.deliverables as string) || '',
+      approachAndTools: (proposal.approachAndTools as string) || '',
+      paymentTerms: (proposal.paymentTerms as string) || '',
+      cancellationNotice: (proposal.cancellationNotice as string) || '',
+      timeline: Array.isArray(proposal.timeline) ? proposal.timeline : ((proposal.timeline as string) || ''),
     },
   });
   // Debounced partial save for sections
@@ -125,7 +129,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       debounceTimer.current = setTimeout(async () => {
         try {
           savingRef.current = true;
-          const payload: any = fields ?? {
+          const payload: Partial<ProposalFormData> = fields ?? {
             executiveSummary: (document.getElementById('executiveSummary') as HTMLTextAreaElement)?.value,
             objectivesAndOutcomes: (document.getElementById('objectivesAndOutcomes') as HTMLTextAreaElement)?.value,
             scopeOfWork: (document.getElementById('scopeOfWork') as HTMLTextAreaElement)?.value,
@@ -1158,9 +1162,9 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                               quantity: q.qty,
                               billingPeriod: base.billingPeriod,
                               taxPct: base.taxPct,
-                            } as any;
+                            };
                           })
-                          .filter(Boolean) as any[];
+                          .filter(Boolean) as Array<{ name: string; type: string; unitPrice: number; quantity: number; billingPeriod?: string; taxPct?: number }>;
                         try {
                           const updated = await proposalsApi.updatePricing(proposal.id, { items });
                           toast.success('Pricing updated');

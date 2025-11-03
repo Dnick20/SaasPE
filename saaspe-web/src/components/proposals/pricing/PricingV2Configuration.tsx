@@ -311,17 +311,17 @@ export function PricingV2Configuration({
   const handleLoadTemplate = async (templateType: string) => {
     try {
       const result = await seedBlueprints.mutateAsync();
-      const template = result.templates.find((t: any) => t.label.toLowerCase().includes(templateType));
+      const template = result.templates.find((t: { label: string }) => t.label.toLowerCase().includes(templateType));
 
       if (template) {
         await handleAddPricingOption({
-          label: template.label,
-          billingCadence: template.billingCadence,
-          summary: template.summary,
-          tierType: template.tierType,
-          paymentTerms: template.paymentTerms,
-          cancellationNotice: template.cancellationNotice,
-          lineItems: template.coreServices,
+          label: template.label as string,
+          billingCadence: template.billingCadence as any,
+          summary: template.summary as string,
+          tierType: template.tierType as any,
+          paymentTerms: template.paymentTerms as any,
+          cancellationNotice: template.cancellationNotice as any,
+          lineItems: template.coreServices as any,
         });
       }
     } catch (error) {
