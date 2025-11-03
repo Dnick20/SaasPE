@@ -270,7 +270,7 @@ export function PlaybookWizard({ clientId, clientName, proposalId }: PlaybookWiz
         {currentStep === 'campaign' && (
           <CampaignStructureStep
             data={playbookData}
-            onChange={(data) => setPlaybookData({ ...playbookData, ...data })}
+            onChange={(data) => setPlaybookData({ ...playbookData, ...data } as any)}
           />
         )}
       </div>
