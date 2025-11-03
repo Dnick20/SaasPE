@@ -18,8 +18,8 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { TrendingUp, DollarSign, Users, FileText, Mail, Loader2, Download } from 'lucide-react';
-import { useAnalyticsMetrics, useAiCosts } from '@/lib/hooks/useAnalytics';
+import { TrendingUp, DollarSign, Users, FileText, Mail, Loader2, Download, Target, Award, Clock } from 'lucide-react';
+import { useAnalyticsMetrics, useAiCosts, useProposalWinRate, useProposalPipeline, useTimeToClose } from '@/lib/hooks/useAnalytics';
 import { formatCurrency } from '@/lib/utils';
 
 const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
@@ -52,6 +52,9 @@ export default function AnalyticsPage() {
   const { startDate, endDate } = getDateRange();
   const { data: metrics, isLoading, error } = useAnalyticsMetrics(startDate, endDate);
   const { data: aiCosts, isLoading: _costsLoading } = useAiCosts(startDate, endDate);
+  const { data: winRate, isLoading: winRateLoading } = useProposalWinRate(startDate, endDate);
+  const { data: pipeline, isLoading: pipelineLoading } = useProposalPipeline();
+  const { data: timeToClose, isLoading: timeToCloseLoading } = useTimeToClose();
 
   if (isLoading) {
     return (
@@ -228,6 +231,150 @@ export default function AnalyticsPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      {/* Win Rate Analytics Section */}
+      {!winRateLoading && winRate && (
+        <>
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Proposal Performance</h2>
+          </div>
+
+          {/* Win Rate Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Win Rate</CardTitle>
+                <Target className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{winRate.rates.winRate}%</div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {winRate.overview.totalWon} of {winRate.overview.totalSent} proposals
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Sign Rate</CardTitle>
+                <Award className="h-4 w-4 text-blue-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{winRate.rates.signRate}%</div>
+                <p className="text-xs text-gray-500 mt-1">
+                  {winRate.overview.totalSigned} signed
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
+                <TrendingUp className="h-4 w-4 text-yellow-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-yellow-600">{winRate.overview.pending}</div>
+                <p className="text-xs text-gray-500 mt-1">Awaiting response</p>
+              </CardContent>
+            </Card>
+
+            {!timeToCloseLoading && timeToClose && timeToClose.totalClosed > 0 && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Avg. Time to Close</CardTitle>
+                  <Clock className="h-4 w-4 text-purple-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-purple-600">{timeToClose.averageDaysToClose} days</div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Median: {timeToClose.medianDaysToClose} days
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          {/* Win Rate Time Series & Pipeline */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Win Rate Over Time */}
+            {winRate.timeSeries.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Win Rate Trend</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={winRate.timeSeries}>
+                      <defs>
+                        <linearGradient id="colorWinRate" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis dataKey="month" stroke="#6B7280" fontSize={12} />
+                      <YAxis stroke="#6B7280" fontSize={12} />
+                      <Tooltip
+                        formatter={(value: any) => {
+                          if (typeof value === 'number') return `${value.toFixed(1)}%`;
+                          if (typeof value === 'string') return `${value}%`;
+                          return String(value);
+                        }}
+                      />
+                      <Legend />
+                      <Area
+                        type="monotone"
+                        dataKey="winRate"
+                        stroke="#10B981"
+                        fillOpacity={1}
+                        fill="url(#colorWinRate)"
+                        name="Win Rate (%)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Proposal Pipeline Funnel */}
+            {!pipelineLoading && pipeline && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Proposal Pipeline</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {pipeline.stages.map((stage, index) => (
+                      <div key={stage.stage} className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="capitalize font-medium text-gray-700">{stage.stage}</span>
+                          <span className="text-gray-600">
+                            {stage.count} ({stage.percentage}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-3">
+                          <div
+                            className="h-3 rounded-full transition-all"
+                            style={{
+                              width: `${stage.percentage}%`,
+                              backgroundColor: COLORS[index % COLORS.length],
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-4 border-t border-gray-200">
+                      <p className="text-sm text-gray-600">
+                        Total Proposals: <span className="font-bold">{pipeline.total}</span>
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </>
+      )}
 
       {/* AI Costs */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
