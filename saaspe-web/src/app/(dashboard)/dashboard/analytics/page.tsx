@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -295,7 +297,7 @@ export default function AnalyticsPage() {
                     cy="50%"
                     labelLine={false}
                     label={(props: any) =>
-                      `${props.name}: ${(props.percent * 100).toFixed(0)}%`
+                      `${props.name}: ${((props.percent || 0) * 100).toFixed(0)}%`
                     }
                     outerRadius={80}
                     fill="#8884d8"

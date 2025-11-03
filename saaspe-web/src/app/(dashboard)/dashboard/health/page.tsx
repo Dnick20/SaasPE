@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import useSWR from 'swr';
 import { apiClient } from '@/lib/api/client';
 
@@ -15,7 +17,7 @@ export default function HealthPage() {
       {error && <p className="text-red-600">Failed to load: {String(error)}</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {data?.mailboxes?.map((m: any) => (
+        {data?.mailboxes?.map((m: { id: string; email: string; status: string; healthScore?: number; bounceRate: number; complaintRate: number }) => (
           <div key={m.id} className="border rounded p-4 space-y-2">
             <div className="flex items-center justify-between">
               <div>

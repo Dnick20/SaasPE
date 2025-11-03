@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { TokenBalanceCard } from '@/components/tokens/token-balance-card';
 import { TransactionHistory } from '@/components/tokens/transaction-history';

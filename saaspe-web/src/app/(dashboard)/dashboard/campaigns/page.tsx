@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, Plus, Play, Pause, Trash2, TrendingUp } from 'lucide-react';

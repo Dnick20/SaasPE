@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useSearchParams } from 'next/navigation';
 import { useClient } from '@/lib/hooks/useClients';
 import { PlaybookWizard } from '@/components/playbook/wizard/PlaybookWizard';

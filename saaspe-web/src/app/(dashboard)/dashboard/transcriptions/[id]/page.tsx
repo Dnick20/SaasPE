@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { ArrowLeft, Sparkles, FileText, Download, CheckCircle, Loader2, Trophy, Trash2, UserPlus, Wand2, Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -85,7 +87,7 @@ export default function TranscriptionDetailPage({ params }: TranscriptionDetailP
       contactEmail?: string;
       contactPhone?: string;
       contactLinkedIn?: string;
-      additionalContacts?: any;
+      additionalContacts?: unknown;
       problemStatement?: string;
       currentTools?: string[];
       deliverablesLogistics?: string;
@@ -490,7 +492,7 @@ export default function TranscriptionDetailPage({ params }: TranscriptionDetailP
                         <Label htmlFor="status">Status</Label>
                         <Select
                           value={clientFormData.status}
-                          onValueChange={(value: any) => setClientFormData({ ...clientFormData, status: value })}
+                          onValueChange={(value: 'prospect' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost') => setClientFormData({ ...clientFormData, status: value })}
                         >
                           <SelectTrigger id="status">
                             <SelectValue />

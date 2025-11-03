@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useRouter } from 'next/navigation';
 import { Plus, BookOpen, Trash2, Mail, MessageSquare, Phone, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';

@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -55,8 +57,8 @@ function AIProposalNewContent() {
       setSubmitting(true);
       const proposal = await proposalsApi.generateAI({ clientId, transcriptionId, title: title || undefined, tone });
       router.push(`/dashboard/proposals/${proposal.id}/edit`);
-    } catch (e: any) {
-      setError(e?.message || 'Failed to generate proposal');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to generate proposal');
     } finally {
       setSubmitting(false);
     }

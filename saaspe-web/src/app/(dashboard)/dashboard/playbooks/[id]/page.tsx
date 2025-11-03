@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { ArrowLeft, Edit, Trash2, BookOpen, Mail, MessageSquare, Phone, Loader2, Download, ExternalLink } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -197,7 +199,7 @@ export default function PlaybookDetailPage({ params }: PlaybookDetailPageProps) 
                 </div>
               </div>
             )}
-            {playbook.campaignStrategy.channels && playbook.campaignStrategy.channels.length > 0 && (
+            {Array.isArray(playbook.campaignStrategy.channels) && playbook.campaignStrategy.channels.length > 0 ? (
               <div className="md:col-span-3">
                 <h3 className="text-sm font-medium text-gray-500 mb-2">Channels</h3>
                 <div className="flex flex-wrap gap-2">
@@ -211,7 +213,7 @@ export default function PlaybookDetailPage({ params }: PlaybookDetailPageProps) 
                   ))}
                 </div>
               </div>
-            )}
+            ) : null}
           </div>
         </CardContent>
       </Card>

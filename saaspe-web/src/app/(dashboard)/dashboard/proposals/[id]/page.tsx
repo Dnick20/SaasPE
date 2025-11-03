@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { ArrowLeft, Download, Send, FileText, Loader2, Sparkles, PenTool, CheckCircle2, Clock, Rocket, CreditCard, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -270,7 +272,7 @@ export default function ProposalDetailPage({ params }: ProposalDetailPageProps) 
                 </p>
               ) : Array.isArray(proposal.deliverables) ? (
                 <ul className="list-disc list-inside space-y-2">
-                  {(proposal.deliverables as any[]).map((item: any, index: number) => (
+                  {(proposal.deliverables as Array<string | { description?: string; name?: string }>).map((item, index: number) => (
                     <li key={index} className="text-gray-700">
                       {typeof item === 'string' ? item : item.description || item.name || ''}
                     </li>
@@ -313,7 +315,7 @@ export default function ProposalDetailPage({ params }: ProposalDetailPageProps) 
                 <div className="relative">
                   <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
                   <div className="space-y-4">
-                    {proposal.timeline.map((phase: any, idx: number) => (
+                    {proposal.timeline.map((phase: { status?: string; title?: string; start?: string; end?: string; notes?: string }, idx: number) => (
                       <div key={idx} className="relative pl-10">
                         <div className="absolute left-0 top-1.5 h-6 w-6 rounded-full bg-white border border-gray-300 flex items-center justify-center">
                           {phase.status === 'complete' ? (

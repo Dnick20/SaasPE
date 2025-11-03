@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { ArrowLeft, Edit, Trash2, Building2, Mail, Phone, Globe, FileText, Loader2, Linkedin } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';

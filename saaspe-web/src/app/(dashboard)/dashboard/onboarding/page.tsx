@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { DiscoveryWizard } from '@/components/onboarding/DiscoveryWizard';
 
 export default function OnboardingPage() {

@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import * as Sentry from '@sentry/nextjs';
 import { useState } from 'react';
 import { reportError, trackUserAction } from '@/lib/services/errorReporting';

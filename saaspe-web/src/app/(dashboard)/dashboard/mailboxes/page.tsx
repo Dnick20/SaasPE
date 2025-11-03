@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import React, { useState } from 'react';
 import { EmailWizard } from '@/components/mailboxes/EmailWizard';
 import { MailboxList } from '@/components/mailboxes/MailboxList';

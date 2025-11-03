@@ -1,5 +1,7 @@
 'use client';
 
+
+export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import {
   Mail,
@@ -43,8 +45,8 @@ export default function RepliesPage() {
 
   // Update classification mutation
   const updateClassificationMutation = useMutation({
-    mutationFn: ({ id, classification }: { id: string; classification: any }) =>
-      repliesApi.updateClassification(id, classification),
+    mutationFn: ({ id, classification }: { id: string; classification: string }) =>
+      repliesApi.updateClassification(id, classification as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['replies'] });
       queryClient.invalidateQueries({ queryKey: ['replies-stats'] });
@@ -69,7 +71,8 @@ export default function RepliesPage() {
   });
 
   const getClassificationBadge = (classification?: string) => {
-    const badges: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon: any }> = {
+    type IconComponent = typeof ThumbsUp;
+    const badges: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string; icon: IconComponent }> = {
       interested: { variant: 'default', label: 'Interested', icon: ThumbsUp },
       not_interested: { variant: 'secondary', label: 'Not Interested', icon: ThumbsDown },
       out_of_office: { variant: 'outline', label: 'Out of Office', icon: Clock },
@@ -337,7 +340,7 @@ export default function RepliesPage() {
                         onClick={() =>
                           updateClassificationMutation.mutate({
                             id: selectedReply.id,
-                            classification: classification as any,
+                            classification,
                           })
                         }
                         disabled={updateClassificationMutation.isPending}
