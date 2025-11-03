@@ -1,0 +1,79 @@
+/**
+ * Design System Tokens
+ * Extracted from premium design demo
+ * These tokens form the foundation of the SaaSOPE design system
+ */
+
+:root {
+  /* Color Palette - Slate (Neutral) */
+  --slate-900: #0F172A;
+  --slate-800: #1E293B;
+  --slate-700: #334155;
+  --slate-600: #475569;
+  --slate-500: #64748B;
+  --slate-400: #94A3B8;
+  --slate-300: #CBD5E1;
+  --slate-200: #E2E8F0;
+  --slate-100: #F1F5F9;
+  --slate-50: #F8FAFC;
+
+  /* Color Palette - Blue (Primary) */
+  --blue-600: #2563EB;
+  --blue-700: #1D4ED8;
+  --blue-500: #3B82F6;
+  --blue-50: #EFF6FF;
+
+  /* Color Palette - Emerald (Success) */
+  --emerald-600: #059669;
+  --emerald-100: #D1FAE5;
+
+  /* Color Palette - Amber (Warning) */
+  --amber-600: #D97706;
+  --amber-100: #FEF3C7;
+
+  /* Color Palette - Red (Error/Destructive) */
+  --red-600: #DC2626;
+  --red-100: #FEE2E2;
+
+  /* Color Palette - Sky (Info) */
+  --sky-600: #0284C7;
+  --sky-100: #E0F2FE;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+
+  /* Spacing Scale (derived from component padding/margin values) */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  --spacing-2xl: 32px;
+  --spacing-3xl: 40px;
+  --spacing-4xl: 48px;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Transitions */
+  --transition-base: all 0.2s;
+  --transition-fast: all 0.15s;
+  --transition-slow: all 0.3s;
+
+  /* Typography */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* Layout */
+  --sidebar-width: 256px;
+  --navbar-height: 64px;
+  --container-max-width: 1440px;
+}
+
