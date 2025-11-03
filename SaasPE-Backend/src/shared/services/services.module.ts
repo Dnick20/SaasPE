@@ -10,6 +10,7 @@ import { RegistrarService } from './registrar.service';
 import { SesManagementService } from './ses-management.service';
 import { WordExporterService } from './word-exporter.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
+import { MultiPassExtractionService } from './multi-pass-extraction.service';
 
 /**
  * Shared Services Module
@@ -43,6 +44,7 @@ import { ConfidenceScoringService } from './confidence-scoring.service';
     SesManagementService,
     WordExporterService,
     ConfidenceScoringService,
+    MultiPassExtractionService,
   ],
   exports: [
     EncryptionService,
@@ -55,6 +57,7 @@ import { ConfidenceScoringService } from './confidence-scoring.service';
     SesManagementService,
     WordExporterService,
     ConfidenceScoringService,
+    MultiPassExtractionService,
   ],
 })
 export class ServicesModule {}

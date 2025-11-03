@@ -1485,6 +1485,33 @@ Extract all relevant data points and create compelling, tailored content for eac
   }
 
   /**
+   * Generic chat completion method for custom use cases
+   * Exposes OpenAI client for services that need custom completions
+   */
+  async createChatCompletion(params: {
+    model: string;
+    messages: Array<{ role: string; content: string }>;
+    response_format?: { type: 'json_object' | 'text' };
+    temperature?: number;
+    max_tokens?: number;
+  }): Promise<any> {
+    try {
+      const response = await this.client.chat.completions.create({
+        model: params.model,
+        messages: params.messages as any,
+        response_format: params.response_format,
+        temperature: params.temperature || 0.7,
+        max_tokens: params.max_tokens,
+      });
+
+      return response;
+    } catch (error) {
+      this.logger.error('Chat completion failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get content type for audio/video files
    */
   private getContentType(fileName: string): string {

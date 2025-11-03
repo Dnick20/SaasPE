@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { OpenAIService } from '../../../shared/services/openai.service';
 import { ConfidenceScoringService, SectionQuality } from '../../../shared/services/confidence-scoring.service';
+import { MultiPassExtractionService } from '../../../shared/services/multi-pass-extraction.service';
 import {
   SectionContext,
   getExtractionPrompt,
@@ -32,6 +33,7 @@ export class ProposalAutofillService {
     private prisma: PrismaService,
     private openai: OpenAIService,
     private confidenceScoring: ConfidenceScoringService,
+    private multiPass: MultiPassExtractionService,
   ) {}
 
   /**
@@ -99,77 +101,147 @@ export class ProposalAutofillService {
       },
     };
 
-    // STEP 1: Extract insights using gpt-4o-mini (fast, cheap, accurate)
-    this.logger.log('Step 1: Extracting insights from transcription');
-    const extractedInsights = await this.extractInsights(context);
+    // Check if Phase 2 multi-pass extraction is enabled
+    const usePhase2 = process.env.ENABLE_PHASE2_MULTIPASS === 'true';
 
-    // STEP 2: Generate each section using gpt-4o (better quality for generation)
-    this.logger.log('Step 2: Generating proposal sections');
-    const [
-      overview,
-      executiveSummary,
-      objectivesAndOutcomes,
-      scopeOfWork,
-      deliverables,
-      approachAndTools,
-      scopeAndTimeline,
-      pricing,
-      paymentTerms,
-      cancellationNotice,
-    ] = await Promise.all([
-      this.generateOverview(context, extractedInsights),
-      this.generateExecutiveSummary(context, extractedInsights),
-      this.generateObjectivesAndOutcomes(context, extractedInsights),
-      this.generateScopeOfWork(context, extractedInsights),
-      this.generateDeliverables(context, extractedInsights),
-      this.generateApproachAndTools(context, extractedInsights),
-      this.generateScope(context, extractedInsights),
-      this.generatePricing(context, extractedInsights),
-      this.generatePaymentTerms(context, extractedInsights),
-      this.generateCancellationNotice(context, extractedInsights),
-    ]);
+    let overview, executiveSummary, objectivesAndOutcomes, scopeOfWork, deliverables;
+    let approachAndTools, scopeAndTimeline, pricing, paymentTerms, cancellationNotice;
+    let multiPassResult: any;
+
+    if (usePhase2) {
+      // PHASE 2: Multi-pass extraction with gap filling
+      this.logger.log('Phase 2: Starting multi-pass extraction (3 passes)');
+
+      multiPassResult = await this.multiPass.extractWithMultiPass(
+        context.transcription?.transcript || '',
+        context
+      );
+
+      this.logger.log(`Multi-pass complete: Overall confidence ${(multiPassResult.overallConfidence * 100).toFixed(0)}%, ` +
+        `Coverage ${(multiPassResult.coverageScore * 100).toFixed(0)}%, ` +
+        `Cost $${multiPassResult.totalCost.toFixed(3)}, ` +
+        `Duration ${(multiPassResult.totalDuration / 1000).toFixed(1)}s`);
+
+      // Map multi-pass results to section format
+      const sections = multiPassResult.finalSections;
+      overview = { title: sections.overview?.content || 'Proposal Overview' };
+      executiveSummary = { executiveSummary: sections.executiveSummary?.content || '' };
+      objectivesAndOutcomes = { objectivesAndOutcomes: sections.objectivesAndOutcomes?.content || '' };
+      scopeOfWork = { scopeOfWork: sections.scopeOfWork?.content || '' };
+      deliverables = { deliverables: sections.deliverables?.content || '' };
+      approachAndTools = { approachAndTools: sections.approachAndTools?.content || '' };
+      scopeAndTimeline = { timeline: sections.timeline?.content || '' };
+      pricing = { pricingOptions: sections.pricing?.content || '' };
+      paymentTerms = { paymentTerms: sections.paymentTerms?.content || '' };
+      cancellationNotice = { cancellationNotice: sections.cancellationNotice?.content || '' };
+
+    } else {
+      // PHASE 1: Current two-step extraction (for backward compatibility)
+      this.logger.log('Phase 1: Extracting insights from transcription');
+      const extractedInsights = await this.extractInsights(context);
+
+      this.logger.log('Phase 1: Generating proposal sections');
+      [
+        overview,
+        executiveSummary,
+        objectivesAndOutcomes,
+        scopeOfWork,
+        deliverables,
+        approachAndTools,
+        scopeAndTimeline,
+        pricing,
+        paymentTerms,
+        cancellationNotice,
+      ] = await Promise.all([
+        this.generateOverview(context, extractedInsights),
+        this.generateExecutiveSummary(context, extractedInsights),
+        this.generateObjectivesAndOutcomes(context, extractedInsights),
+        this.generateScopeOfWork(context, extractedInsights),
+        this.generateDeliverables(context, extractedInsights),
+        this.generateApproachAndTools(context, extractedInsights),
+        this.generateScope(context, extractedInsights),
+        this.generatePricing(context, extractedInsights),
+        this.generatePaymentTerms(context, extractedInsights),
+        this.generateCancellationNotice(context, extractedInsights),
+      ]);
+    }
 
     // STEP 3: Extract confidence data from all responses
     this.logger.log('Step 3: Extracting confidence scores from AI responses');
     const sectionQualities: SectionQuality[] = [];
+    let qualityMetrics: any;
 
-    // Extract confidence from each section response
-    const overviewQuality = this.confidenceScoring.extractConfidenceFromResponse(overview, 'overview');
-    if (overviewQuality) sectionQualities.push(overviewQuality);
+    if (usePhase2 && multiPassResult) {
+      // Phase 2: Use confidence data from multi-pass extraction
+      const sections = multiPassResult.finalSections;
 
-    const execSummaryQuality = this.confidenceScoring.extractConfidenceFromResponse(executiveSummary, 'executiveSummary');
-    if (execSummaryQuality) sectionQualities.push(execSummaryQuality);
+      // Convert multi-pass confidence data to SectionQuality format
+      Object.entries(sections).forEach(([sectionName, sectionData]: [string, any]) => {
+        if (sectionData && sectionData.confidence) {
+          sectionQualities.push({
+            sectionName: sectionName,
+            confidence: {
+              overall: sectionData.confidence.overall || 0.7,
+              dataAvailability: sectionData.confidence.dataAvailability || 0.7,
+              specificity: sectionData.confidence.specificity || 0.7,
+              personalization: sectionData.confidence.personalization || 0.7,
+            },
+            flags: sectionData.flags || [],
+            sources: sectionData.sources || [],
+            reasoning: sectionData.reasoning || '',
+          });
+        }
+      });
 
-    const objectivesQuality = this.confidenceScoring.extractConfidenceFromResponse(objectivesAndOutcomes, 'objectivesAndOutcomes');
-    if (objectivesQuality) sectionQualities.push(objectivesQuality);
+      // Calculate quality metrics using Phase 2 data
+      qualityMetrics = this.confidenceScoring.calculateProposalMetrics(sectionQualities);
 
-    const scopeOfWorkQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeOfWork, 'scopeOfWork');
-    if (scopeOfWorkQuality) sectionQualities.push(scopeOfWorkQuality);
+      // Override with multi-pass metrics if available
+      qualityMetrics.overallConfidence = multiPassResult.overallConfidence;
+      qualityMetrics.coverageScore = multiPassResult.coverageScore;
 
-    const deliverablesQuality = this.confidenceScoring.extractConfidenceFromResponse(deliverables, 'deliverables');
-    if (deliverablesQuality) sectionQualities.push(deliverablesQuality);
+    } else {
+      // Phase 1: Extract confidence from text responses
+      const overviewQuality = this.confidenceScoring.extractConfidenceFromResponse(overview, 'overview');
+      if (overviewQuality) sectionQualities.push(overviewQuality);
 
-    const approachQuality = this.confidenceScoring.extractConfidenceFromResponse(approachAndTools, 'approachAndTools');
-    if (approachQuality) sectionQualities.push(approachQuality);
+      const execSummaryQuality = this.confidenceScoring.extractConfidenceFromResponse(executiveSummary, 'executiveSummary');
+      if (execSummaryQuality) sectionQualities.push(execSummaryQuality);
 
-    const timelineQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeAndTimeline, 'timeline');
-    if (timelineQuality) sectionQualities.push(timelineQuality);
+      const objectivesQuality = this.confidenceScoring.extractConfidenceFromResponse(objectivesAndOutcomes, 'objectivesAndOutcomes');
+      if (objectivesQuality) sectionQualities.push(objectivesQuality);
 
-    const pricingQuality = this.confidenceScoring.extractConfidenceFromResponse(pricing, 'pricing');
-    if (pricingQuality) sectionQualities.push(pricingQuality);
+      const scopeOfWorkQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeOfWork, 'scopeOfWork');
+      if (scopeOfWorkQuality) sectionQualities.push(scopeOfWorkQuality);
 
-    const paymentTermsQuality = this.confidenceScoring.extractConfidenceFromResponse(paymentTerms, 'paymentTerms');
-    if (paymentTermsQuality) sectionQualities.push(paymentTermsQuality);
+      const deliverablesQuality = this.confidenceScoring.extractConfidenceFromResponse(deliverables, 'deliverables');
+      if (deliverablesQuality) sectionQualities.push(deliverablesQuality);
 
-    const cancellationQuality = this.confidenceScoring.extractConfidenceFromResponse(cancellationNotice, 'cancellationNotice');
-    if (cancellationQuality) sectionQualities.push(cancellationQuality);
+      const approachQuality = this.confidenceScoring.extractConfidenceFromResponse(approachAndTools, 'approachAndTools');
+      if (approachQuality) sectionQualities.push(approachQuality);
 
-    const extractionQuality = this.confidenceScoring.extractConfidenceFromResponse(extractedInsights, 'extraction');
-    if (extractionQuality) sectionQualities.push(extractionQuality);
+      const timelineQuality = this.confidenceScoring.extractConfidenceFromResponse(scopeAndTimeline, 'timeline');
+      if (timelineQuality) sectionQualities.push(timelineQuality);
 
-    // STEP 4: Calculate overall quality metrics
-    this.logger.log('Step 4: Calculating proposal quality metrics');
-    const qualityMetrics = this.confidenceScoring.calculateProposalMetrics(sectionQualities);
+      const pricingQuality = this.confidenceScoring.extractConfidenceFromResponse(pricing, 'pricing');
+      if (pricingQuality) sectionQualities.push(pricingQuality);
+
+      const paymentTermsQuality = this.confidenceScoring.extractConfidenceFromResponse(paymentTerms, 'paymentTerms');
+      if (paymentTermsQuality) sectionQualities.push(paymentTermsQuality);
+
+      const cancellationQuality = this.confidenceScoring.extractConfidenceFromResponse(cancellationNotice, 'cancellationNotice');
+      if (cancellationQuality) sectionQualities.push(cancellationQuality);
+
+      // Phase 1 also extracts from insights
+      const extractionQuality = this.confidenceScoring.extractConfidenceFromResponse(await this.extractInsights(context), 'extraction');
+      if (extractionQuality) sectionQualities.push(extractionQuality);
+
+      // Calculate quality metrics
+      qualityMetrics = this.confidenceScoring.calculateProposalMetrics(sectionQualities);
+    }
+
+    // STEP 4: Log quality report
+    this.logger.log('Step 4: Logging quality metrics');
 
     // Log quality report
     const qualityReport = this.confidenceScoring.generateQualityReport(qualityMetrics);
@@ -210,7 +282,24 @@ export class ProposalAutofillService {
           flaggedForReview: qualityMetrics.flaggedForReview,
           timestamp: new Date().toISOString(),
         } as any,
-        aiGenerationMetadata: {
+        aiGenerationMetadata: usePhase2 && multiPassResult ? {
+          phase: 2,
+          model: 'gpt-4o + gpt-4o-mini (multi-pass)',
+          irVersion: 'v2.0.31',
+          multiPass: {
+            totalCost: multiPassResult.totalCost,
+            totalDuration: multiPassResult.totalDuration,
+            passes: multiPassResult.passes.length,
+            costBreakdown: multiPassResult.costBreakdown,
+            gapsIdentified: multiPassResult.gapsIdentified.length,
+            gapsResolved: multiPassResult.gapsResolved.length,
+            remainingGaps: multiPassResult.remainingGaps.length,
+            consistencyIssues: multiPassResult.consistencyIssues?.length || 0,
+          },
+          entities: multiPassResult.finalEntities,
+          timestamp: new Date().toISOString(),
+        } as any : {
+          phase: 1,
           model: 'gpt-4o + gpt-4o-mini',
           extractionModel: 'gpt-4o-mini',
           generationModel: 'gpt-4o',
