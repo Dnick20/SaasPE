@@ -21,14 +21,14 @@ export function DiscoveryWizardModular() {
   const router = useRouter();
   const { markStepComplete, goToNextStep } = useCustomerJourney();
   const [currentStep, setCurrentStep] = useState<DiscoveryStep>('company');
-  const [companyData, setCompanyData] = useState<any>(null);
+  const [companyData, setCompanyData] = useState<Record<string, unknown> | null>(null);
 
-  const handleCompanyComplete = (data: any) => {
+  const handleCompanyComplete = (data: Record<string, unknown>) => {
     setCompanyData(data);
     setCurrentStep('icp');
   };
 
-  const handleICPComplete = async (icpData: any) => {
+  const handleICPComplete = async (icpData: Record<string, unknown>) => {
     try {
       // Create company profile with all data
       const profile = await companyProfileApi.create({
@@ -39,11 +39,11 @@ export function DiscoveryWizardModular() {
       // Mark discovery step complete
       markStepComplete('discovery', {
         companyProfileId: profile.data.id,
-        companyName: companyData.companyName,
-        website: companyData.website,
-        industry: companyData.industry,
-        targetICP: icpData.targetICP,
-        preferredTone: icpData.preferredTone,
+        companyName: companyData.companyName as string,
+        website: companyData.website as string | undefined,
+        industry: companyData.industry as string | undefined,
+        targetICP: icpData.targetICP as any,
+        preferredTone: icpData.preferredTone as string | undefined,
       });
 
       // Navigate to next step
