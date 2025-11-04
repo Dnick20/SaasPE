@@ -61,7 +61,7 @@ export function DiscoveryWizard() {
     website: journey.metadata.website || '',
     industry: journey.metadata.industry || '',
     targetICP: journey.metadata.targetICP || '',
-    preferredTone: journey.metadata.preferredTone || 'professional',
+    preferredTone: (journey.metadata.preferredTone as 'professional' | 'friendly' | 'consultative' | 'casual') || 'professional',
   });
 
   const updateField = (field: keyof DiscoveryFormData, value: string) => {
