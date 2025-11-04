@@ -10,13 +10,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCustomerJourney } from '@/lib/journey/use-customer-journey';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { companyProfileApi } from '@/lib/api/endpoints/company-profile';
 
 interface DiscoveryFormData {
   companyName: string;
   website: string;
   industry: string;
   targetICP: string;
-  preferredTone: string;
+  preferredTone: 'professional' | 'friendly' | 'consultative' | 'casual';
 }
 
 type Step = 1 | 2 | 3 | 4;
@@ -83,33 +84,19 @@ export function DiscoveryWizard() {
     setIsLoading(true);
 
     try {
-      // Use relative URL so cookies are sent (same-origin request)
-      // Try to create company profile
-      let response = await fetch('/api/v1/company-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(formData),
-      });
-
-      // If profile already exists (409 Conflict), update it instead
-      if (response.status === 409) {
-        console.log('Company profile exists, updating instead...');
-        response = await fetch('/api/v1/company-profile', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(formData),
+      // Prefer shared API client (handles cookies + 401 refresh automatically)
+      // Try to create first; if Conflict, update instead
+      let profileResponse = await companyProfileApi
+        .create(formData)
+        .catch(async (err: any) => {
+          if (err?.response?.status === 409) {
+            // Profile exists → perform full update
+            return companyProfileApi.update(formData);
+          }
+          throw err;
         });
-      }
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Failed to save company profile:', response.status, errorText);
-        throw new Error('Failed to save company profile');
-      }
-
-      const profile = await response.json();
+      const profile = profileResponse.data as any;
       console.log('Company profile saved:', profile);
 
       // Update journey metadata
