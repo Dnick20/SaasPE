@@ -2,12 +2,13 @@ import { IsString, IsOptional, IsObject, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateProposalFromTranscriptionDto {
-  @ApiProperty({
-    description: 'Client ID',
+  @ApiPropertyOptional({
+    description: 'Client ID (optional if auto-creating from transcription)',
     example: 'client-uuid-123',
   })
   @IsString()
-  clientId: string;
+  @IsOptional()
+  clientId?: string;
 
   @ApiProperty({
     description: 'Transcription ID to generate from',

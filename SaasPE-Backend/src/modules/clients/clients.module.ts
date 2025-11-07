@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../shared/database/database.module';
+import { ContactsModule } from '../contacts/contacts.module';
 import { ClientsController } from './clients.controller';
 import { ClientsService } from './clients.service';
 
@@ -17,7 +18,7 @@ import { ClientsService } from './clients.service';
  * - Database (Prisma)
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ContactsModule],
   controllers: [ClientsController],
   providers: [ClientsService],
   exports: [ClientsService],

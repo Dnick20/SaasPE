@@ -38,6 +38,7 @@
     "@aws-sdk/client-secrets-manager": "^3.917.0",
     "@aws-sdk/client-ses": "^3.913.0",
     "@aws-sdk/client-sesv2": "^3.922.0",
+    "@aws-sdk/client-sqs": "^3.926.0",
     "@aws-sdk/s3-request-presigner": "^3.913.0",
     "@nestjs/bull": "^11.0.4",
     "@nestjs/common": "^11.0.1",

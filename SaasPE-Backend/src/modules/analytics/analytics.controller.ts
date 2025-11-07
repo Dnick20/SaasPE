@@ -61,4 +61,27 @@ export class AnalyticsController {
   async getMailboxAnalytics(@Req() req) {
     return this.analyticsService.getMailboxAnalytics(req.user.tenantId);
   }
+
+  @Get('proposals/win-rate')
+  async getProposalWinRate(
+    @Req() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.analyticsService.getProposalWinRate(
+      req.user.tenantId,
+      startDate,
+      endDate,
+    );
+  }
+
+  @Get('proposals/pipeline')
+  async getProposalPipeline(@Req() req) {
+    return this.analyticsService.getProposalPipeline(req.user.tenantId);
+  }
+
+  @Get('proposals/time-to-close')
+  async getTimeToClose(@Req() req) {
+    return this.analyticsService.getTimeToClose(req.user.tenantId);
+  }
 }

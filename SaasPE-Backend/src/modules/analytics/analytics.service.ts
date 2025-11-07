@@ -568,4 +568,260 @@ export class AnalyticsService {
       mailboxes: mailboxStats,
     };
   }
+
+  /**
+   * Get proposal win rate analytics
+   * Tracks proposal success rates and conversion metrics
+   */
+  async getProposalWinRate(
+    tenantId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const dateFilter: any = { tenantId };
+    if (startDate || endDate) {
+      dateFilter.sentAt = {};
+      if (startDate) dateFilter.sentAt.gte = new Date(startDate);
+      if (endDate) dateFilter.sentAt.lte = new Date(endDate);
+    }
+
+    // Get all proposals that were sent (excludes draft/ready)
+    const [sentProposals, signedProposals, wonProposals, rejectedProposals] =
+      await Promise.all([
+        this.prisma.proposal.count({
+          where: {
+            ...dateFilter,
+            sentAt: { not: null },
+          },
+        }),
+        this.prisma.proposal.count({
+          where: {
+            ...dateFilter,
+            status: 'signed',
+          },
+        }),
+        this.prisma.proposal.count({
+          where: {
+            ...dateFilter,
+            wonBusiness: true,
+          },
+        }),
+        this.prisma.proposal.count({
+          where: {
+            ...dateFilter,
+            status: 'rejected',
+          },
+        }),
+      ]);
+
+    // Calculate rates
+    const signRate = sentProposals > 0 ? (signedProposals / sentProposals) * 100 : 0;
+    const winRate = sentProposals > 0 ? (wonProposals / sentProposals) * 100 : 0;
+    const lossRate = sentProposals > 0 ? (rejectedProposals / sentProposals) * 100 : 0;
+
+    // Get win rate over time for trend analysis
+    const winRateTimeSeries = await this.getWinRateTimeSeries(
+      tenantId,
+      startDate,
+      endDate,
+    );
+
+    return {
+      overview: {
+        totalSent: sentProposals,
+        totalSigned: signedProposals,
+        totalWon: wonProposals,
+        totalRejected: rejectedProposals,
+        pending: sentProposals - signedProposals - rejectedProposals,
+      },
+      rates: {
+        signRate: parseFloat(signRate.toFixed(2)),
+        winRate: parseFloat(winRate.toFixed(2)),
+        lossRate: parseFloat(lossRate.toFixed(2)),
+      },
+      timeSeries: winRateTimeSeries,
+    };
+  }
+
+  /**
+   * Get win rate time series data for trend visualization
+   */
+  private async getWinRateTimeSeries(
+    tenantId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const start = startDate
+      ? new Date(startDate)
+      : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // Default 90 days
+    const end = endDate ? new Date(endDate) : new Date();
+
+    // Get all proposals grouped by month
+    const proposals = await this.prisma.proposal.findMany({
+      where: {
+        tenantId,
+        sentAt: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        sentAt: true,
+        status: true,
+        wonBusiness: true,
+      },
+    });
+
+    // Group by month
+    const monthMap = new Map<string, { sent: number; won: number; signed: number }>();
+
+    proposals.forEach((p) => {
+      if (p.sentAt) {
+        const monthKey = `${p.sentAt.getFullYear()}-${String(p.sentAt.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!monthMap.has(monthKey)) {
+          monthMap.set(monthKey, { sent: 0, won: 0, signed: 0 });
+        }
+
+        const data = monthMap.get(monthKey)!;
+        data.sent++;
+        if (p.wonBusiness) data.won++;
+        if (p.status === 'signed') data.signed++;
+      }
+    });
+
+    // Convert to array and calculate rates
+    return Array.from(monthMap.entries())
+      .map(([month, data]) => ({
+        month,
+        sent: data.sent,
+        won: data.won,
+        signed: data.signed,
+        winRate: data.sent > 0 ? ((data.won / data.sent) * 100).toFixed(1) : '0.0',
+        signRate: data.sent > 0 ? ((data.signed / data.sent) * 100).toFixed(1) : '0.0',
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }
+
+  /**
+   * Get proposal pipeline breakdown by status
+   * Shows proposals at each stage of the sales funnel
+   */
+  async getProposalPipeline(tenantId: string) {
+    const [draft, ready, sent, signed, rejected] = await Promise.all([
+      this.prisma.proposal.count({
+        where: { tenantId, status: 'draft' },
+      }),
+      this.prisma.proposal.count({
+        where: { tenantId, status: 'ready' },
+      }),
+      this.prisma.proposal.count({
+        where: { tenantId, status: 'sent' },
+      }),
+      this.prisma.proposal.count({
+        where: { tenantId, status: 'signed' },
+      }),
+      this.prisma.proposal.count({
+        where: { tenantId, status: 'rejected' },
+      }),
+    ]);
+
+    const total = draft + ready + sent + signed + rejected;
+
+    return {
+      stages: [
+        {
+          stage: 'draft',
+          count: draft,
+          percentage: total > 0 ? ((draft / total) * 100).toFixed(1) : '0.0',
+        },
+        {
+          stage: 'ready',
+          count: ready,
+          percentage: total > 0 ? ((ready / total) * 100).toFixed(1) : '0.0',
+        },
+        {
+          stage: 'sent',
+          count: sent,
+          percentage: total > 0 ? ((sent / total) * 100).toFixed(1) : '0.0',
+        },
+        {
+          stage: 'signed',
+          count: signed,
+          percentage: total > 0 ? ((signed / total) * 100).toFixed(1) : '0.0',
+        },
+        {
+          stage: 'rejected',
+          count: rejected,
+          percentage: total > 0 ? ((rejected / total) * 100).toFixed(1) : '0.0',
+        },
+      ],
+      total,
+    };
+  }
+
+  /**
+   * Get time-to-close metrics
+   * Calculates average time from proposal sent to signed
+   */
+  async getTimeToClose(tenantId: string) {
+    // Get all signed proposals with sent and signed dates
+    const signedProposals = await this.prisma.proposal.findMany({
+      where: {
+        tenantId,
+        status: 'signed',
+        sentAt: { not: null },
+        clientSignedAt: { not: null },
+      },
+      select: {
+        sentAt: true,
+        clientSignedAt: true,
+        created: true,
+      },
+    });
+
+    if (signedProposals.length === 0) {
+      return {
+        averageDaysToClose: 0,
+        medianDaysToClose: 0,
+        fastestClose: 0,
+        slowestClose: 0,
+        totalClosed: 0,
+      };
+    }
+
+    // Calculate days to close for each proposal
+    const daysToClose = signedProposals
+      .map((p) => {
+        if (!p.sentAt || !p.clientSignedAt) return null;
+        const diffMs = p.clientSignedAt.getTime() - p.sentAt.getTime();
+        return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+      })
+      .filter((days): days is number => days !== null);
+
+    if (daysToClose.length === 0) {
+      return {
+        averageDaysToClose: 0,
+        medianDaysToClose: 0,
+        fastestClose: 0,
+        slowestClose: 0,
+        totalClosed: 0,
+      };
+    }
+
+    // Calculate statistics
+    const average = daysToClose.reduce((sum, days) => sum + days, 0) / daysToClose.length;
+    const sorted = [...daysToClose].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const fastest = Math.min(...daysToClose);
+    const slowest = Math.max(...daysToClose);
+
+    return {
+      averageDaysToClose: parseFloat(average.toFixed(1)),
+      medianDaysToClose: median,
+      fastestClose: fastest,
+      slowestClose: slowest,
+      totalClosed: daysToClose.length,
+    };
+  }
 }

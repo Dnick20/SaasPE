@@ -49,11 +49,15 @@ export class AuthController {
     // Don't set domain for localhost/local development
     const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
 
+    // For cross-origin requests (app.saasope.com → api.saasope.com), we need sameSite: 'none'
+    // For same-origin, 'lax' is fine
+    const sameSiteValue = useSecureCookies ? 'none' : 'lax';
+
     // Set access token cookie (httpOnly, secure in production)
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,
       secure: useSecureCookies,
-      sameSite: 'lax',
+      sameSite: sameSiteValue,
       maxAge: 15 * 60 * 1000, // 15 minutes
       path: '/',
       domain: cookieDomain,
@@ -63,7 +67,7 @@ export class AuthController {
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: useSecureCookies,
-      sameSite: 'lax',
+      sameSite: sameSiteValue,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
       domain: cookieDomain,
@@ -73,7 +77,7 @@ export class AuthController {
     res.cookie('userId', userId, {
       httpOnly: false, // Readable by JavaScript
       secure: useSecureCookies,
-      sameSite: 'lax',
+      sameSite: sameSiteValue,
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: '/',
       domain: cookieDomain,

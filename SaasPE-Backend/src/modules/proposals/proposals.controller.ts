@@ -455,10 +455,10 @@ export class ProposalsController {
   }
 
   @Post(':id/feedback')
-  @ApiOperation({ summary: 'Submit feedback on AI-generated proposal' })
+  @ApiOperation({ summary: 'Submit feedback on AI-generated proposal (Phase 1: Enhanced with Validation)' })
   @ApiResponse({
     status: 200,
-    description: 'Feedback submitted successfully',
+    description: 'Feedback submitted successfully with validation results',
   })
   @ApiResponse({ status: 404, description: 'Proposal not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -472,8 +472,10 @@ export class ProposalsController {
       editedVersion?: string;
       feedback?: string;
       outcome?: 'won_deal' | 'lost_deal' | 'no_response' | 'unclear';
+      detailedRatings?: Record<string, number>;
+      dealValue?: number;
     },
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{ success: boolean; message: string; validation?: any }> {
     return this.proposalsService.submitFeedback(
       user.tenantId,
       id,

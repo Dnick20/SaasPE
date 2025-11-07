@@ -3,10 +3,12 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import type { Queue } from 'bull';
 import { PrismaService } from '../../shared/database/prisma.service';
+import type { QueueProvider } from '../../shared/queue/queue.types';
 import { S3Service } from '../../shared/services/s3.service';
 import { PdfService } from '../../shared/services/pdf.service';
 import { ESignatureProviderFactory } from '../../shared/services/e-signature-provider.factory';
@@ -85,6 +87,7 @@ export class ProposalsService {
     private wordExporterService: WordExporterService,
     private proposalContextBuilder: ProposalContextBuilderService,
     @InjectQueue('proposal') private proposalQueue: Queue,
+    @Inject('QueueProvider') private queueProvider: QueueProvider,
     // Phase 1: Personalized Learning Services
     private editTrackingService: EditTrackingService,
     private feedbackValidationService: FeedbackValidationService,
@@ -162,6 +165,11 @@ export class ProposalsService {
       `Generating AI proposal draft for client ${dto.clientId} (transcription: ${dto.transcriptionId || 'none'})`,
     );
 
+    // Validate required fields
+    if (!dto.clientId) {
+      throw new BadRequestException('clientId is required');
+    }
+
     // Validate client exists
     const client = await this.prisma.client.findFirst({
       where: { id: dto.clientId, tenantId },
@@ -169,6 +177,9 @@ export class ProposalsService {
     if (!client) {
       throw new NotFoundException(`Client ${dto.clientId} not found`);
     }
+
+    // TypeScript assertion: clientId is now confirmed to be defined
+    const clientId = dto.clientId;
 
     // Optional transcription context
     let transcription: any | undefined;
@@ -185,7 +196,7 @@ export class ProposalsService {
 
     // Build rich context for AI (includes ICP, website, tone, highlights)
     const context = await this.proposalContextBuilder.buildContext(
-      dto.clientId,
+      clientId,
       dto.transcriptionId,
     );
 
@@ -222,7 +233,7 @@ export class ProposalsService {
       data: {
         tenantId,
         userId,
-        clientId: dto.clientId,
+        clientId,
         transcriptionId: dto.transcriptionId,
         title: dto.title || `Proposal for ${client.companyName}`,
         status: 'draft',
@@ -486,10 +497,10 @@ export class ProposalsService {
       customInstructions: dto.customInstructions,
     };
 
-    const job = await this.proposalQueue.add(PROPOSAL_GENERATE_JOB, jobData);
+    const jobId = await this.queueProvider.add(PROPOSAL_GENERATE_JOB, jobData);
 
     this.logger.log(
-      `Proposal generation job ${job.id} queued for proposal ${id}`,
+      `Proposal generation job ${jobId} queued for proposal ${id}`,
     );
 
     // Estimate completion time (rough estimate: 30 seconds)
@@ -498,7 +509,7 @@ export class ProposalsService {
     return {
       id,
       status: 'generating',
-      jobId: String(job.id),
+      jobId: jobId,
       estimatedCompletion: estimatedCompletion.toISOString(),
     };
   }
@@ -1071,9 +1082,22 @@ export class ProposalsService {
     userId: string,
     dto: CreateProposalFromTranscriptionDto,
   ): Promise<any> {
-    this.logger.log(
-      `Creating proposal from transcription ${dto.transcriptionId}`,
-    );
+    const startTime = Date.now();
+
+    // Structured logging: Request started
+    this.logger.log('Create from transcription started', {
+      tenantId,
+      userId,
+      transcriptionId: dto.transcriptionId,
+      clientId: dto.clientId,
+      timestamp: new Date().toISOString(),
+      event: 'create_from_transcription_started',
+    });
+
+    // Validate required fields
+    if (!dto.clientId) {
+      throw new BadRequestException('clientId is required');
+    }
 
     // Validate client exists
     const client = await this.prisma.client.findFirst({
@@ -1083,6 +1107,9 @@ export class ProposalsService {
     if (!client) {
       throw new NotFoundException(`Client ${dto.clientId} not found`);
     }
+
+    // TypeScript assertion: clientId is now confirmed to be defined
+    const clientId = dto.clientId;
 
     // Validate transcription exists
     const transcription = await this.prisma.transcription.findFirst({
@@ -1106,7 +1133,7 @@ export class ProposalsService {
       data: {
         tenantId,
         userId,
-        clientId: dto.clientId,
+        clientId,
         transcriptionId: dto.transcriptionId,
         title: dto.title,
         generationMethod: 'transcription',
@@ -1147,15 +1174,26 @@ export class ProposalsService {
       ],
     };
 
-    const job = await this.proposalQueue.add(PROPOSAL_GENERATE_JOB, jobData);
+    const jobId = await this.queueProvider.add(PROPOSAL_GENERATE_JOB, jobData);
 
-    this.logger.log(
-      `Proposal generation from transcription job ${job.id} queued for proposal ${proposal.id}`,
-    );
+    const duration = Date.now() - startTime;
+
+    // Structured logging: Job queued successfully
+    this.logger.log('Proposal generation from transcription queued', {
+      tenantId,
+      userId,
+      proposalId: proposal.id,
+      transcriptionId: dto.transcriptionId,
+      clientId,
+      jobId,
+      duration,
+      timestamp: new Date().toISOString(),
+      event: 'create_from_transcription_queued',
+    });
 
     return {
       id: proposal.id,
-      jobId: String(job.id),
+      jobId: jobId,
       status: 'generating',
       message: 'Proposal is being generated from transcription',
     };

@@ -67,6 +67,15 @@ interface ProposalContent {
   timeline?: string;
   pricing?: string;
   [key: string]: any;
+  // Token usage metadata (optional, added when available)
+  _metadata?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    model?: string;
+    contextPackUsed?: boolean;
+    tokenSavings?: number;
+  };
 }
 
 /**
@@ -870,8 +879,115 @@ If contact information is not mentioned, return null for that field.`;
   }
 
   /**
+   * Create ContextPack using gpt-4o-mini
+   * Extracts structured context from transcript with ~60% token reduction
+   * This is the recommended approach over summarizeTranscript
+   */
+  async createContextPack(transcript: string): Promise<{
+    painPoints: string[];
+    desiredOutcomes: string[];
+    budgetConstraints: string;
+    timelineConstraints: string;
+    stakeholders: string[];
+    technicalRequirements: string[];
+    currentSolutions: string[];
+    keyDecisions: string[];
+    meetingHighlights: string;
+    originalLength: number;
+    contextPackLength: number;
+    tokenSavings: number;
+  }> {
+    this.logger.log(
+      `Creating ContextPack from transcript (${transcript.length} chars)`,
+    );
+
+    try {
+      const response = await this.client.chat.completions.create({
+        model: 'gpt-4o-mini', // Cost-effective model for extraction
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert at extracting structured business context from meeting transcripts.
+Extract key information into a structured format that will be used for proposal generation.
+Focus on client pain points, requirements, budget, timeline, and decision criteria.
+Be precise and preserve all critical business details.`,
+          },
+          {
+            role: 'user',
+            content: `Extract structured context from this meeting transcript:
+
+${transcript}
+
+Return a JSON object with these fields:
+- painPoints: Array of client problems and challenges mentioned
+- desiredOutcomes: Array of what the client wants to achieve
+- budgetConstraints: Budget information (string, include ranges if mentioned)
+- timelineConstraints: Timeline information (string, include deadlines)
+- stakeholders: Array of people involved and their roles
+- technicalRequirements: Array of technical needs or constraints
+- currentSolutions: Array of tools/systems they currently use
+- keyDecisions: Array of decisions made or pending
+- meetingHighlights: Brief summary of the most important takeaways (2-3 sentences max)
+
+If any field has no relevant information, return an empty array or empty string.`,
+          },
+        ],
+        response_format: { type: 'json_object' },
+        temperature: 0.3, // Lower temperature for factual extraction
+        max_tokens: 1500,
+      });
+
+      const content = response.choices[0].message.content;
+      if (!content) {
+        throw new Error('Empty response from gpt-4o-mini');
+      }
+
+      const contextPack = JSON.parse(content);
+      const contextPackLength = JSON.stringify(contextPack).length;
+      const tokenSavings = Math.round(
+        ((transcript.length - contextPackLength) / transcript.length) * 100,
+      );
+
+      this.logger.log(
+        `ContextPack created: ${contextPackLength} chars (${tokenSavings}% reduction)`,
+      );
+
+      return {
+        ...contextPack,
+        originalLength: transcript.length,
+        contextPackLength,
+        tokenSavings,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to create ContextPack: ${error.message}`,
+        error.stack,
+      );
+      // Fallback to basic summarization if ContextPack fails
+      const summarized = await this.summarizeTranscript(transcript);
+      return {
+        painPoints: [],
+        desiredOutcomes: [],
+        budgetConstraints: '',
+        timelineConstraints: '',
+        stakeholders: [],
+        technicalRequirements: [],
+        currentSolutions: [],
+        keyDecisions: [],
+        meetingHighlights: summarized,
+        originalLength: transcript.length,
+        contextPackLength: summarized.length,
+        tokenSavings: Math.round(
+          ((transcript.length - summarized.length) / transcript.length) * 100,
+        ),
+      };
+    }
+  }
+
+  /**
    * Summarize transcript if it exceeds token limits
    * Uses GPT-4o-mini for cost-effective summarization
+   * NOTE: Consider using createContextPack() instead for better structure
    */
   private async summarizeTranscript(
     transcript: string,
@@ -1005,11 +1121,25 @@ Be concise but comprehensive.`,
     maxTokens: number = 4000,
   ): Promise<ProposalContent> {
     try {
-      // Summarize transcript if too long
+      // Use ContextPack if enabled (recommended for token reduction)
+      const useContextPack = process.env.ENABLE_CONTEXT_PACK !== 'false'; // Enabled by default
       let processedTranscript = transcriptData?.transcript || '';
+      let contextPack: any = null;
+
       if (processedTranscript.length > 8000) {
-        processedTranscript =
-          await this.summarizeTranscript(processedTranscript);
+        if (useContextPack) {
+          this.logger.log('Using ContextPack for token reduction');
+          contextPack = await this.createContextPack(processedTranscript);
+          this.logger.log(
+            `ContextPack stats: ${contextPack.tokenSavings}% token reduction`,
+          );
+          // Don't need full transcript anymore
+          processedTranscript = '';
+        } else {
+          this.logger.log('Using legacy summarization (ContextPack disabled)');
+          processedTranscript =
+            await this.summarizeTranscript(processedTranscript);
+        }
       }
 
       // Get learning insights to improve generation
@@ -1121,6 +1251,50 @@ Generate a proposal.`;
       }
 
       // Add current task
+      let contextSection = '';
+      if (contextPack) {
+        // Use structured ContextPack data
+        contextSection = `Meeting Context (Extracted):
+${
+  contextPack.painPoints?.length
+    ? `\nClient Pain Points:\n${contextPack.painPoints.map((p: string) => `- ${p}`).join('\n')}`
+    : ''
+}
+${
+  contextPack.desiredOutcomes?.length
+    ? `\nDesired Outcomes:\n${contextPack.desiredOutcomes.map((o: string) => `- ${o}`).join('\n')}`
+    : ''
+}
+${contextPack.budgetConstraints ? `\nBudget: ${contextPack.budgetConstraints}` : ''}
+${contextPack.timelineConstraints ? `\nTimeline: ${contextPack.timelineConstraints}` : ''}
+${
+  contextPack.stakeholders?.length
+    ? `\nStakeholders:\n${contextPack.stakeholders.map((s: string) => `- ${s}`).join('\n')}`
+    : ''
+}
+${
+  contextPack.technicalRequirements?.length
+    ? `\nTechnical Requirements:\n${contextPack.technicalRequirements.map((t: string) => `- ${t}`).join('\n')}`
+    : ''
+}
+${
+  contextPack.currentSolutions?.length
+    ? `\nCurrent Solutions:\n${contextPack.currentSolutions.map((s: string) => `- ${s}`).join('\n')}`
+    : ''
+}
+${
+  contextPack.keyDecisions?.length
+    ? `\nKey Decisions:\n${contextPack.keyDecisions.map((d: string) => `- ${d}`).join('\n')}`
+    : ''
+}
+${contextPack.meetingHighlights ? `\nMeeting Highlights: ${contextPack.meetingHighlights}` : ''}`;
+      } else if (processedTranscript) {
+        // Fallback to transcript/summary
+        contextSection = `Meeting Transcript:\n${processedTranscript}`;
+      } else {
+        contextSection = 'No transcript available';
+      }
+
       const currentTaskPrompt = `Now generate a new proposal with these sections: ${sections.join(', ')}
 
 Client Information:
@@ -1131,17 +1305,25 @@ Client Information:
 - Timeline: ${clientData.timeline || 'Not specified'}
 - Current Tools: ${clientData.currentTools?.join(', ') || 'None mentioned'}
 
-${
-  processedTranscript
-    ? `Meeting Transcript:\n${processedTranscript}`
-    : 'No transcript available'
-}
+${contextSection}
 
 ${
   transcriptData?.extractedData
     ? `Extracted Insights:\n${JSON.stringify(transcriptData.extractedData, null, 2)}`
     : ''
 }
+
+CRITICAL - PRICING FORMAT:
+The "pricing" field MUST be a JSON object with the following structure:
+{
+  "items": [
+    {"name": "Service Name", "description": "What's included", "price": 5000}
+  ],
+  "total": 5000
+}
+- Each item.price must be a NUMBER (not string, no $ symbol)
+- Total must equal the sum of all item prices
+- Example: {"items": [{"name": "Setup Fee", "description": "Initial setup and configuration", "price": 2500}, {"name": "Monthly Retainer", "description": "Ongoing support and management", "price": 5000}], "total": 7500}
 
 Generate a compelling proposal following the format of the winning examples above. Return a JSON object with keys for each section.`;
 
@@ -1185,7 +1367,16 @@ Generate a compelling proposal following the format of the winning examples abov
   "proposedSolution": "string",
   "scope": "string",
   "timeline": "string",
-  "pricing": "string"
+  "pricing": {
+    "items": [
+      {
+        "name": "string (service name)",
+        "description": "string (what's included)",
+        "price": "number (price in USD, no currency symbols)"
+      }
+    ],
+    "total": "number (sum of all item prices)"
+  }
 }`;
 
       let content: ProposalContent;
@@ -1213,9 +1404,20 @@ Generate a compelling proposal following the format of the winning examples abov
         throw parseError;
       }
 
-      this.logger.log(
-        `Proposal content generated with learning. Tokens used: ${response.usage?.total_tokens}`,
-      );
+      // Structured logging: AI generation with token metrics
+      this.logger.log('Proposal content generated with learning', {
+        tenantId,
+        tokens: {
+          prompt: response.usage?.prompt_tokens,
+          completion: response.usage?.completion_tokens,
+          total: response.usage?.total_tokens,
+        },
+        model: 'gpt-4o',
+        contextPackUsed: useContextPack && !!contextPack,
+        contextPackSavings: contextPack?.tokenSavings,
+        sectionsGenerated: Object.keys(content).length,
+        event: 'openai_proposal_generated',
+      });
 
       // Log successful operation to audit log
       await this.logAIOperation({
@@ -1225,6 +1427,16 @@ Generate a compelling proposal following the format of the winning examples abov
         response: JSON.stringify(content).substring(0, 1000),
         tokensUsed: response.usage?.total_tokens,
       });
+
+      // Attach metadata for processor
+      content._metadata = {
+        promptTokens: response.usage?.prompt_tokens,
+        completionTokens: response.usage?.completion_tokens,
+        totalTokens: response.usage?.total_tokens,
+        model: 'gpt-4o',
+        contextPackUsed: useContextPack && !!contextPack,
+        tokenSavings: contextPack?.tokenSavings,
+      };
 
       return content;
     } catch (error) {

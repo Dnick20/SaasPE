@@ -3,6 +3,8 @@ import { BullModule } from '@nestjs/bull';
 import { DatabaseModule } from '../../shared/database/database.module';
 import { TokensModule } from '../tokens/tokens.module';
 import { AuthModule } from '../auth/auth.module';
+import { ClientsModule } from '../clients/clients.module';
+import { TranscriptionsModule } from '../transcriptions/transcriptions.module';
 import { S3Service } from '../../shared/services/s3.service';
 import { OpenAIService } from '../../shared/services/openai.service';
 import { PdfService } from '../../shared/services/pdf.service';
@@ -23,11 +25,21 @@ import { ProposalComposerService } from './services/proposal-composer.service';
 import { ProposalContextBuilderService } from './services/proposal-context-builder.service';
 import { PricingTemplateService } from './services/pricing-template.service';
 import { ProposalAutofillService } from './services/proposal-autofill.service';
+import { QueueWorkerService } from './services/queue-worker.service';
 
 // Phase 1: Personalized Learning Services
 import { EditTrackingService } from '../../shared/services/edit-tracking.service';
 import { FeedbackValidationService } from '../../shared/services/feedback-validation.service';
 import { PatternExtractionService } from '../../shared/services/pattern-extraction.service';
+
+// Phase 2: Multi-Pass Extraction Services
+import { ConfidenceScoringService } from '../../shared/services/confidence-scoring.service';
+import { MultiPassExtractionService } from '../../shared/services/multi-pass-extraction.service';
+
+// Queue Abstraction
+import { QueueProvider } from '../../shared/queue/queue.types';
+import { SQSQueueProvider } from '../../shared/queue/sqs-queue.provider';
+import { InMemoryQueueProvider } from '../../shared/queue/inmemory-queue.provider';
 
 /**
  * Proposals Module
@@ -37,7 +49,7 @@ import { PatternExtractionService } from '../../shared/services/pattern-extracti
  * - AI content generation with GPT-4
  * - PDF export with Puppeteer
  * - DocuSign e-signature integration
- * - Bull queue for async processing
+ * - Queue abstraction (SQS in production, in-memory in dev)
  * - Token-based pricing for AI/AWS features
  *
  * Dependencies:
@@ -47,21 +59,53 @@ import { PatternExtractionService } from '../../shared/services/pattern-extracti
  * - OpenAI Service (GPT-4)
  * - PDF Service (Puppeteer)
  * - DocuSign Service (eSignature)
- * - Bull Queue (Redis-backed job queue)
+ * - Queue Provider (SQS/InMemory based on QUEUE_PROVIDER env)
  */
 @Module({
   imports: [
     DatabaseModule,
     TokensModule,
     AuthModule,
+    ClientsModule,
+    TranscriptionsModule,
     BullModule.registerQueue({
       name: 'proposal',
     }),
   ],
   controllers: [ProposalsController],
   providers: [
+    // Queue Provider Factory
+    {
+      provide: 'QueueProvider',
+      useFactory: () => {
+        const queueProvider = process.env.QUEUE_PROVIDER || 'memory';
+
+        if (queueProvider === 'sqs') {
+          const queueUrl = process.env.SQS_QUEUE_URL;
+          const dlqUrl = process.env.SQS_DLQ_URL;
+          const region = process.env.AWS_REGION || 'us-east-2';
+
+          if (!queueUrl) {
+            throw new Error('SQS_QUEUE_URL is required when QUEUE_PROVIDER=sqs');
+          }
+
+          return new SQSQueueProvider({
+            queueUrl,
+            dlqUrl,
+            region,
+            waitTimeSeconds: 20,
+            maxMessages: 5,
+            visibilityTimeout: 900, // 15 minutes
+          });
+        } else {
+          // Default to in-memory queue for dev/test
+          return new InMemoryQueueProvider(3); // concurrency of 3
+        }
+      },
+    },
     ProposalsService,
     ProposalProcessor,
+    QueueWorkerService,
     PdfRendererService,
     ProposalComposerService,
     ProposalContextBuilderService,
@@ -83,6 +127,9 @@ import { PatternExtractionService } from '../../shared/services/pattern-extracti
     EditTrackingService,
     FeedbackValidationService,
     PatternExtractionService,
+    // Phase 2: Multi-Pass Extraction
+    ConfidenceScoringService,
+    MultiPassExtractionService,
   ],
   exports: [ProposalsService],
 })

@@ -2,11 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 
 export class GenerateAIProposalDto {
-  @ApiProperty({ description: 'Client ID to generate the proposal for' })
+  @ApiPropertyOptional({ description: 'Client ID to generate the proposal for (optional if transcriptionId provided)' })
+  @IsOptional()
   @IsString()
-  clientId: string;
+  clientId?: string;
 
-  @ApiPropertyOptional({ description: 'Optional transcription ID to use as context' })
+  @ApiPropertyOptional({ description: 'Optional transcription ID to use as context and auto-create client' })
   @IsOptional()
   @IsString()
   transcriptionId?: string;

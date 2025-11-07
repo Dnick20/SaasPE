@@ -600,7 +600,30 @@ export class TranscriptionsService {
       transcription.transcript,
     );
 
-    this.logger.log(`Lead intake extracted from transcription ${id}`);
+    // Validate extraction quality
+    const summary = {
+      transcriptionId: id,
+      primaryEmail: leadIntake.primary_contact?.email || 'MISSING',
+      altContacts: leadIntake.alt_contacts?.length || 0,
+      contactsWithoutEmail: 0,
+      contactsTotal: 1
+    };
+
+    if (leadIntake.alt_contacts && Array.isArray(leadIntake.alt_contacts)) {
+      summary.contactsTotal += leadIntake.alt_contacts.length;
+      leadIntake.alt_contacts.forEach((contact, idx) => {
+        if (!contact.email) {
+          summary.contactsWithoutEmail++;
+          this.logger.debug(`Alt contact ${idx} missing email`, {
+            firstName: contact.first_name,
+            lastName: contact.last_name,
+            role: contact.role_or_note
+          });
+        }
+      });
+    }
+
+    this.logger.log('Lead intake extraction summary', summary);
 
     // Store provenance data in transcription's extractedData
     if (leadIntake.provenance) {

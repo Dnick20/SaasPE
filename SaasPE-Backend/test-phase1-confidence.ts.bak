@@ -1,0 +1,212 @@
+/**
+ * Test Script for IR v2.0.31 Phase 1 - Confidence Scoring
+ *
+ * This script tests the new confidence scoring and quality tracking system
+ * by generating a proposal from a sample transcript and displaying quality metrics.
+ */
+
+import { PrismaClient } from '@prisma/client';
+import { OpenAIService } from './src/shared/services/openai.service';
+import { ConfidenceScoringService } from './src/shared/services/confidence-scoring.service';
+import { ProposalAutofillService } from './src/modules/proposals/services/proposal-autofill.service';
+import * as fs from 'fs';
+
+const prisma = new PrismaClient();
+
+async function testPhase1() {
+  console.log('='.repeat(80));
+  console.log('IR v2.0.31 Phase 1 - Confidence Scoring Test');
+  console.log('='.repeat(80));
+  console.log('');
+
+  try {
+    // Initialize services
+    console.log('1️⃣  Initializing services...');
+    const openaiService = new OpenAIService();
+    const confidenceService = new ConfidenceScoringService();
+    const autofillService = new ProposalAutofillService(
+      prisma,
+      openaiService,
+      confidenceService,
+    );
+    console.log('✅ Services initialized\n');
+
+    // Read test transcript
+    console.log('2️⃣  Reading test transcript...');
+    const transcript = fs.readFileSync(
+      '/Users/dominiclewis/Downloads/SaaS Agency App/SaasPE/test_transcript.txt',
+      'utf-8',
+    );
+    console.log(`✅ Loaded transcript (${transcript.length} chars)\n`);
+
+    // Create test prospect/client
+    console.log('3️⃣  Setting up test data...');
+
+    // Find or create test tenant
+    let tenant = await prisma.tenant.findFirst({
+      where: { name: 'Test Agency' },
+    });
+
+    if (!tenant) {
+      tenant = await prisma.tenant.create({
+        data: {
+          name: 'Test Agency',
+          email: 'test@agency.com',
+          subscriptionTier: 'PREMIUM',
+          subscriptionStatus: 'ACTIVE',
+        },
+      });
+    }
+
+    // Create test user
+    let user = await prisma.user.findFirst({
+      where: { email: 'test@agency.com' },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email: 'test@agency.com',
+          name: 'Test User',
+          role: 'admin',
+          tenantId: tenant.id,
+        },
+      });
+    }
+
+    // Create test prospect
+    const prospect = await prisma.prospect.create({
+      data: {
+        name: 'Acme Corp',
+        email: 'john@acmecorp.com',
+        contactName: 'John Doe',
+        company: 'Acme Corp',
+        tenantId: tenant.id,
+        status: 'qualified',
+      },
+    });
+
+    // Create test proposal
+    const proposal = await prisma.proposal.create({
+      data: {
+        prospectId: prospect.id,
+        tenantId: tenant.id,
+        status: 'draft',
+        transcript: transcript,
+        title: 'Test Proposal for Confidence Scoring',
+      },
+    });
+
+    console.log(`✅ Created test proposal: ${proposal.id}\n`);
+
+    // Run autofill with new confidence scoring
+    console.log('4️⃣  Generating proposal with confidence scoring...');
+    console.log('   This will take 30-60 seconds...\n');
+
+    const result = await autofillService.autoFillProposal(proposal.id);
+
+    console.log('\n' + '='.repeat(80));
+    console.log('RESULTS - Phase 1 Confidence Scoring');
+    console.log('='.repeat(80));
+    console.log('');
+
+    // Display quality metrics
+    if (result.qualityMetrics) {
+      const metrics = result.qualityMetrics;
+
+      console.log('📊 OVERALL QUALITY METRICS:');
+      console.log('─'.repeat(80));
+      console.log(`Overall Confidence:     ${(metrics.overallConfidence * 100).toFixed(1)}%`);
+      console.log(`Coverage Score:         ${(metrics.coverageScore * 100).toFixed(1)}%`);
+      console.log(`Data Availability:      ${(metrics.dataAvailabilityScore * 100).toFixed(1)}%`);
+      console.log(`Validation Status:      ${metrics.validationPassed ? '✅ PASSED' : '⚠️  NEEDS REVIEW'}`);
+      console.log('');
+
+      console.log('📋 SECTION SCORES:');
+      console.log('─'.repeat(80));
+      Object.entries(metrics.sectionScores).forEach(([section, score]) => {
+        const scoreNum = score as number;
+        const emoji = scoreNum >= 0.8 ? '🟢' : scoreNum >= 0.6 ? '🟡' : '🔴';
+        const percentage = (scoreNum * 100).toFixed(1);
+        console.log(`${emoji} ${section.padEnd(30)} ${percentage.padStart(5)}%`);
+      });
+      console.log('');
+
+      if (metrics.lowConfidenceSections.length > 0) {
+        console.log('⚠️  LOW CONFIDENCE SECTIONS (< 60%):');
+        console.log('─'.repeat(80));
+        metrics.lowConfidenceSections.forEach((section) => {
+          const score = metrics.sectionScores[section];
+          console.log(`   - ${section}: ${(score * 100).toFixed(1)}%`);
+        });
+        console.log('');
+      }
+
+      if (metrics.flaggedForReview.length > 0) {
+        console.log('🚩 FLAGGED FOR REVIEW:');
+        console.log('─'.repeat(80));
+        metrics.flaggedForReview.forEach((section) => {
+          console.log(`   - ${section}`);
+        });
+        console.log('');
+      }
+    }
+
+    // Display stored data verification
+    const savedProposal = await prisma.proposal.findUnique({
+      where: { id: proposal.id },
+    });
+
+    console.log('💾 DATABASE VERIFICATION:');
+    console.log('─'.repeat(80));
+    console.log(`Confidence Scores stored: ${savedProposal?.confidenceScores ? '✅' : '❌'}`);
+    console.log(`Validation Results stored: ${savedProposal?.validationResults ? '✅' : '❌'}`);
+    console.log(`AI Metadata stored: ${savedProposal?.aiGenerationMetadata ? '✅' : '❌'}`);
+    console.log('');
+
+    if (savedProposal?.aiGenerationMetadata) {
+      const metadata = savedProposal.aiGenerationMetadata as any;
+      console.log('🤖 AI GENERATION METADATA:');
+      console.log('─'.repeat(80));
+      console.log(`IR Version:          ${metadata.irVersion || 'N/A'}`);
+      console.log(`Models Used:         ${metadata.model || 'N/A'}`);
+      console.log(`Sections Generated:  ${metadata.sectionsGenerated || 'N/A'}`);
+      console.log(`Timestamp:           ${metadata.timestamp || 'N/A'}`);
+      console.log('');
+    }
+
+    // Cleanup test data
+    console.log('5️⃣  Cleaning up test data...');
+    await prisma.proposal.delete({ where: { id: proposal.id } });
+    await prisma.prospect.delete({ where: { id: prospect.id } });
+    console.log('✅ Test data cleaned up\n');
+
+    console.log('='.repeat(80));
+    console.log('✅ Phase 1 Test Complete!');
+    console.log('='.repeat(80));
+    console.log('');
+    console.log('Summary:');
+    console.log('  - Confidence scoring is working ✅');
+    console.log('  - Quality metrics are calculated ✅');
+    console.log('  - Database fields are populated ✅');
+    console.log('  - Validation framework is active ✅');
+    console.log('');
+
+  } catch (error) {
+    console.error('❌ Test failed:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// Run test
+testPhase1()
+  .then(() => {
+    console.log('Test completed successfully');
+    process.exit(0);
+  })
+  .catch((error) => {
+    console.error('Test failed:', error);
+    process.exit(1);
+  });

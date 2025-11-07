@@ -96,10 +96,18 @@ export class ProposalProcessor implements OnModuleInit {
   @Process(PROPOSAL_GENERATE_JOB)
   async handleGenerate(job: Job<GenerateProposalJobData>): Promise<any> {
     const { proposalId, tenantId, sections, customInstructions } = job.data;
+    const startTime = Date.now();
 
-    this.logger.log(
-      `Starting proposal generation job ${job.id} for proposal ${proposalId}`,
-    );
+    // Structured logging: Job started
+    this.logger.log('Proposal generation started', {
+      jobId: job.id,
+      proposalId,
+      tenantId,
+      sectionsRequested: sections.length,
+      sections: sections.join(', '),
+      timestamp: new Date().toISOString(),
+      event: 'proposal_generation_started',
+    });
 
     try {
       // Get proposal with related data
@@ -138,10 +146,7 @@ export class ProposalProcessor implements OnModuleInit {
         : null;
 
       // Retrieve won proposal examples for few-shot learning
-      this.logger.log(
-        `Retrieving won proposal examples from tenant ${tenantId} for learning`,
-      );
-
+      const examplesStartTime = Date.now();
       const wonProposalExamples = await this.prisma.proposal.findMany({
         where: {
           tenantId,
@@ -168,12 +173,25 @@ export class ProposalProcessor implements OnModuleInit {
           },
         },
       });
+      const examplesDuration = Date.now() - examplesStartTime;
 
-      this.logger.log(
-        `Found ${wonProposalExamples.length} won proposals to learn from. Generating ${sections.length} sections with GPT-4 for proposal ${proposalId}`,
-      );
+      this.logger.log('Retrieved learning examples', {
+        proposalId,
+        examplesFound: wonProposalExamples.length,
+        queryDuration: examplesDuration,
+        event: 'learning_examples_retrieved',
+      });
 
       // Generate content using OpenAI with adaptive learning (feedback + error patterns)
+      const aiStartTime = Date.now();
+      this.logger.log('AI generation starting', {
+        proposalId,
+        sectionsToGenerate: sections.length,
+        hasTranscription: !!transcriptData,
+        hasExamples: wonProposalExamples.length > 0,
+        event: 'ai_generation_started',
+      });
+
       const generatedContent =
         await this.openaiService.generateProposalContentWithLearning(
           tenantId,
@@ -183,26 +201,48 @@ export class ProposalProcessor implements OnModuleInit {
           wonProposalExamples.length > 0 ? wonProposalExamples : undefined,
         );
 
-      // Calculate estimated tokens and cost
-      // Rough estimate: 1 char ≈ 0.25 tokens
-      const totalChars = Object.values(generatedContent).join('').length;
-      const estimatedOutputTokens = Math.ceil(totalChars * 0.25);
-      const estimatedInputTokens = Math.ceil(
-        (JSON.stringify(clientData) + JSON.stringify(transcriptData)).length *
-          0.25,
-      );
+      const aiDuration = Date.now() - aiStartTime;
 
-      // GPT-4 Turbo pricing: ~$0.01 input + ~$0.03 output per 1K tokens
+      // Use actual token counts from API if available, otherwise estimate
+      const actualTokens = generatedContent._metadata;
+      const promptTokens = actualTokens?.promptTokens || Math.ceil(
+        (JSON.stringify(clientData) + JSON.stringify(transcriptData)).length * 0.25,
+      );
+      const completionTokens = actualTokens?.completionTokens || Math.ceil(
+        Object.values(generatedContent).filter(v => typeof v === 'string').join('').length * 0.25,
+      );
+      const totalTokens = actualTokens?.totalTokens || (promptTokens + completionTokens);
+
+      // GPT-4o pricing: $2.50 input + $10.00 output per 1M tokens
+      // Reference: https://openai.com/api/pricing/
       const aiCost =
-        (estimatedInputTokens / 1000) * 0.01 +
-        (estimatedOutputTokens / 1000) * 0.03;
+        (promptTokens / 1_000_000) * 2.50 +
+        (completionTokens / 1_000_000) * 10.00;
+
+      this.logger.log('AI generation completed', {
+        proposalId,
+        aiDuration,
+        sectionsGenerated: Object.keys(generatedContent).filter(k => k !== '_metadata').length,
+        tokens: {
+          prompt: promptTokens,
+          completion: completionTokens,
+          total: totalTokens,
+          source: actualTokens ? 'api_actual' : 'estimated',
+        },
+        contextPack: {
+          used: actualTokens?.contextPackUsed || false,
+          savings: actualTokens?.tokenSavings,
+        },
+        cost: parseFloat(aiCost.toFixed(6)),
+        event: 'ai_generation_completed',
+      });
 
       // Update proposal with generated content
       const updateData: any = {
         status: 'ready',
-        aiModel: 'gpt-4-turbo-preview',
-        aiPromptTokens: estimatedInputTokens,
-        aiCompletionTokens: estimatedOutputTokens,
+        aiModel: actualTokens?.model || 'gpt-4o',
+        aiPromptTokens: promptTokens,
+        aiCompletionTokens: completionTokens,
         aiCost,
       };
 
@@ -230,46 +270,155 @@ export class ProposalProcessor implements OnModuleInit {
             : generatedContent.timeline;
       }
       if (generatedContent.pricing) {
-        // Store pricing as JSON (Prisma Json field)
+        // Store pricing as JSON with normalization and validation
         try {
-          updateData.pricing =
-            typeof generatedContent.pricing === 'string'
-              ? JSON.parse(generatedContent.pricing)
-              : generatedContent.pricing;
+          let pricingObj = typeof generatedContent.pricing === 'string'
+            ? JSON.parse(generatedContent.pricing)
+            : generatedContent.pricing;
+
+          // Normalize prices (accept string or number)
+          if (pricingObj?.items && Array.isArray(pricingObj.items)) {
+            pricingObj.items = pricingObj.items.map((item: any) => ({
+              ...item,
+              price: typeof item.price === 'string'
+                ? parseFloat(item.price.replace(/[^0-9.-]/g, ''))
+                : item.price
+            }));
+
+            // Validate: all prices >= 0
+            const invalidPrices = pricingObj.items.filter((item: any) =>
+              isNaN(item.price) || item.price < 0
+            );
+
+            if (invalidPrices.length > 0) {
+              this.logger.error('Pricing contains invalid prices', {
+                proposalId,
+                invalidItems: invalidPrices.map((item: any) => item.name)
+              });
+              updateData.pricing = null;
+            } else {
+              // Validate: total === sum(items) within 1 cent tolerance
+              const calculatedTotal = pricingObj.items.reduce(
+                (sum: number, item: any) => sum + item.price, 0
+              );
+              const totalDiff = Math.abs(calculatedTotal - (pricingObj.total || 0));
+
+              if (totalDiff > 0.01) {
+                this.logger.warn('Pricing total mismatch - auto-correcting', {
+                  proposalId,
+                  aiTotal: pricingObj.total,
+                  calculatedTotal,
+                  difference: totalDiff
+                });
+                pricingObj.total = calculatedTotal; // Auto-correct
+              }
+
+              updateData.pricing = pricingObj;
+              this.logger.log('Pricing normalized successfully', {
+                proposalId,
+                itemCount: pricingObj.items.length,
+                total: pricingObj.total
+              });
+            }
+          } else {
+            this.logger.error('Pricing missing items array', {
+              proposalId,
+              hasItems: !!pricingObj?.items,
+              isArray: Array.isArray(pricingObj?.items)
+            });
+            updateData.pricing = null;
+          }
         } catch (e) {
-          this.logger.warn('Failed to parse generated pricing:', e);
+          this.logger.error('Pricing parse failed', {
+            proposalId,
+            error: e.message,
+            rawType: typeof generatedContent.pricing,
+            rawPreview: String(generatedContent.pricing).substring(0, 200)
+          });
+          updateData.pricing = null;
         }
       }
 
+      const dbStartTime = Date.now();
       await this.prisma.proposal.update({
         where: { id: proposalId },
         data: updateData,
       });
+      const dbDuration = Date.now() - dbStartTime;
 
-      this.logger.log(
-        `Proposal generation job ${job.id} completed successfully. Cost: $${aiCost.toFixed(4)}`,
-      );
+      const totalDuration = Date.now() - startTime;
+
+      // Structured logging: Job completed successfully
+      this.logger.log('Proposal generation completed successfully', {
+        jobId: job.id,
+        proposalId,
+        tenantId,
+        metrics: {
+          totalDuration,
+          aiDuration,
+          dbDuration,
+          sectionsGenerated: sections.length,
+          tokens: {
+            prompt: promptTokens,
+            completion: completionTokens,
+            total: totalTokens,
+            source: actualTokens ? 'api_actual' : 'estimated',
+          },
+          contextPack: {
+            used: actualTokens?.contextPackUsed || false,
+            savings: actualTokens?.tokenSavings,
+          },
+          cost: parseFloat(aiCost.toFixed(6)),
+          model: actualTokens?.model || 'gpt-4o',
+        },
+        timestamp: new Date().toISOString(),
+        event: 'proposal_generation_completed',
+      });
 
       return {
         success: true,
         proposalId,
         sectionsGenerated: sections.length,
-        tokensUsed: estimatedInputTokens + estimatedOutputTokens,
+        tokensUsed: totalTokens,
         cost: aiCost,
+        duration: totalDuration,
       };
     } catch (error) {
-      this.logger.error(
-        `Proposal generation job ${job.id} failed for proposal ${proposalId}:`,
-        error,
-      );
+      const totalDuration = Date.now() - startTime;
+
+      // Structured logging: Job failed with full context
+      this.logger.error('Proposal generation failed', {
+        jobId: job.id,
+        proposalId,
+        tenantId,
+        error: {
+          message: error.message,
+          stack: error.stack,
+          type: error.constructor.name,
+        },
+        metrics: {
+          totalDuration,
+          failedAfter: totalDuration,
+        },
+        timestamp: new Date().toISOString(),
+        event: 'proposal_generation_failed',
+      });
 
       // Update proposal status to failed
-      await this.prisma.proposal.update({
-        where: { id: proposalId },
-        data: {
-          status: 'draft', // Revert to draft so user can retry
-        },
-      });
+      try {
+        await this.prisma.proposal.update({
+          where: { id: proposalId },
+          data: {
+            status: 'draft', // Revert to draft so user can retry
+          },
+        });
+      } catch (updateError) {
+        this.logger.error('Failed to update proposal status after error', {
+          proposalId,
+          updateError: updateError.message,
+          event: 'proposal_status_update_failed',
+        });
+      }
 
       throw error; // Re-throw to trigger job retry
     }

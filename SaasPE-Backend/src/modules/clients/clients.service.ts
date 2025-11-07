@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../shared/database/prisma.service';
+import { ContactsService } from '../contacts/contacts.service';
 import {
   CreateClientDto,
   UpdateClientDto,
@@ -26,7 +27,10 @@ import {
 export class ClientsService {
   private readonly logger = new Logger(ClientsService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private contactsService: ContactsService,
+  ) {}
 
   /**
    * Create a new client
@@ -70,12 +74,21 @@ export class ClientsService {
         currentTools: dto.currentTools || [],
         budget: dto.budget,
         timeline: dto.timeline,
+        // Rich lead-intake fields
+        budgetNote: dto.budgetNote,
+        timelineNote: dto.timelineNote,
+        additionalContacts: dto.additionalContacts as any,
+        deliverablesLogistics: dto.deliverablesLogistics,
+        keyMeetingsSchedule: dto.keyMeetingsSchedule,
         hubspotDealId: dto.hubspotDealId,
         status: dto.status || 'prospect',
       },
     });
 
     this.logger.log(`Client created: ${client.id}`);
+
+    // Auto-create contacts if provided
+    await this.createContactsFromDto(tenantId, dto, client.companyName);
 
     return this.mapToResponseDto(client);
   }
@@ -228,6 +241,18 @@ export class ClientsService {
         }),
         ...(dto.budget !== undefined && { budget: dto.budget }),
         ...(dto.timeline !== undefined && { timeline: dto.timeline }),
+        // Rich lead-intake fields (partial updates)
+        ...(dto.budgetNote !== undefined && { budgetNote: dto.budgetNote }),
+        ...(dto.timelineNote !== undefined && { timelineNote: dto.timelineNote }),
+        ...(dto.additionalContacts !== undefined && {
+          additionalContacts: dto.additionalContacts as any,
+        }),
+        ...(dto.deliverablesLogistics !== undefined && {
+          deliverablesLogistics: dto.deliverablesLogistics,
+        }),
+        ...(dto.keyMeetingsSchedule !== undefined && {
+          keyMeetingsSchedule: dto.keyMeetingsSchedule,
+        }),
         ...(dto.hubspotDealId !== undefined && {
           hubspotDealId: dto.hubspotDealId,
         }),
@@ -281,6 +306,12 @@ export class ClientsService {
       currentTools: client.currentTools,
       budget: client.budget,
       timeline: client.timeline,
+      // Rich lead-intake fields
+      budgetNote: client.budgetNote,
+      timelineNote: client.timelineNote,
+      additionalContacts: client.additionalContacts,
+      deliverablesLogistics: client.deliverablesLogistics,
+      keyMeetingsSchedule: client.keyMeetingsSchedule,
       hubspotDealId: client.hubspotDealId,
       status: client.status,
       created: client.created.toISOString(),
@@ -288,5 +319,110 @@ export class ClientsService {
       ...(client.transcriptions && { transcriptions: client.transcriptions }),
       ...(client.proposals && { proposals: client.proposals }),
     };
+  }
+
+  /**
+   * Create Contact entities from client DTO (primary and additional contacts)
+   * Best-effort: errors are logged but do not block client creation
+   */
+  private async createContactsFromDto(
+    tenantId: string,
+    dto: CreateClientDto | UpdateClientDto,
+    companyName?: string,
+  ): Promise<void> {
+    const contactsCreated: string[] = [];
+    const contactsFailed: Array<{email: string, reason: string}> = [];
+    const contactsSkipped: Array<{reason: string, data: any}> = [];
+    const emailsSeen = new Set<string>();
+
+    try {
+      // Primary contact
+      if (dto.contactEmail) {
+        emailsSeen.add(dto.contactEmail.toLowerCase());
+        try {
+          await this.contactsService.create(tenantId, {
+            email: dto.contactEmail,
+            firstName: dto.contactFirstName,
+            lastName: dto.contactLastName,
+            company: companyName || undefined,
+            customFields: {},
+            tags: [],
+            source: 'api',
+          });
+          contactsCreated.push(dto.contactEmail);
+        } catch (error) {
+          const reason = error.message || 'Unknown error';
+          this.logger.warn(`Primary contact creation failed: ${dto.contactEmail}`, {reason});
+          contactsFailed.push({email: dto.contactEmail, reason});
+        }
+      }
+
+      // Additional contacts with deduplication
+      const additional: any = (dto as any).additionalContacts;
+      if (Array.isArray(additional)) {
+        this.logger.log(`Processing ${additional.length} additional contacts`);
+
+        for (const c of additional) {
+          const email = c?.email || c?.Email || c?.contactEmail;
+
+          // Dry-run mode: log missing emails without creating noise
+          if (!email) {
+            contactsSkipped.push({
+              reason: 'missing_email',
+              data: {
+                firstName: c?.first_name || c?.firstName,
+                lastName: c?.last_name || c?.lastName,
+                role: c?.role_or_note
+              }
+            });
+            continue;
+          }
+
+          // Deduplicate
+          const emailLower = email.toLowerCase();
+          if (emailsSeen.has(emailLower)) {
+            this.logger.debug(`Skipping duplicate contact: ${email}`);
+            contactsSkipped.push({reason: 'duplicate', data: {email}});
+            continue;
+          }
+          emailsSeen.add(emailLower);
+
+          try {
+            await this.contactsService.create(tenantId, {
+              email,
+              firstName: c?.first_name || c?.firstName || undefined,
+              lastName: c?.last_name || c?.lastName || undefined,
+              company: companyName || undefined,
+              customFields: {
+                role: c?.role_or_note || c?.role || undefined,
+              },
+              tags: ['alt-contact'],
+              source: 'api',
+            });
+            contactsCreated.push(email);
+          } catch (error) {
+            const reason = error.message || 'Unknown error';
+            this.logger.warn(`Additional contact creation failed: ${email}`, {reason});
+            contactsFailed.push({email, reason});
+          }
+        }
+      }
+
+      // Summary log
+      this.logger.log('Contact creation summary', {
+        total: additional?.length || 0,
+        created: contactsCreated.length,
+        failed: contactsFailed.length,
+        skipped: contactsSkipped.length,
+        createdEmails: contactsCreated,
+        failures: contactsFailed,
+        skippedReasons: contactsSkipped.reduce((acc, s) => {
+          acc[s.reason] = (acc[s.reason] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>)
+      });
+    } catch (err) {
+      this.logger.warn(`Contact auto-creation failed: ${(err as Error).message}`);
+    }
   }
 }
