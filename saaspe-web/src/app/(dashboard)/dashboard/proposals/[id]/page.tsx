@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-import { ArrowLeft, Download, Send, FileText, Loader2, Sparkles, PenTool, CheckCircle2, Clock, Rocket, CreditCard, XCircle } from 'lucide-react';
+import { ArrowLeft, Download, Send, FileText, Loader2, Sparkles, PenTool, CheckCircle2, Clock, Rocket, CreditCard, XCircle, Edit } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -131,8 +131,19 @@ export default function ProposalDetailPage({ params }: ProposalDetailPageProps) 
       )}
 
       {/* Action Buttons */}
-      {(proposal.status === 'ready' || proposal.status === 'sent' || proposal.status === 'signed') && (
+      {(proposal.status === 'draft' || proposal.status === 'ready' || proposal.status === 'sent' || proposal.status === 'signed') && (
         <div className="flex gap-3">
+          {/* Edit Button - Only show for ready/draft status */}
+          {(proposal.status === 'ready' || proposal.status === 'draft') && (
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/dashboard/proposals/${id}/edit`)}
+              className="gap-2"
+            >
+              <Edit className="h-4 w-4" />
+              Edit Proposal
+            </Button>
+          )}
           <Button
             className="gap-2"
             onClick={handleExportPdf}
