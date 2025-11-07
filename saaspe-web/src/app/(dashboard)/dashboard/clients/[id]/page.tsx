@@ -251,6 +251,77 @@ export default function ClientDetailPage({ params }: ClientDetailPageProps) {
         </Card>
       )}
 
+      {/* Notes & Constraints */}
+      {(client.budgetNote || client.timelineNote) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Notes & Constraints</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {client.budgetNote && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Budget Note</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{client.budgetNote}</p>
+              </div>
+            )}
+            {client.timelineNote && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Timeline Note</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{client.timelineNote}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Additional Contacts */}
+      {Array.isArray((client as any).additionalContacts) && (client as any).additionalContacts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Additional Contacts</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {((client as any).additionalContacts as any[]).map((c, idx) => (
+              <div key={idx} className="p-3 border rounded-md">
+                <div className="font-medium text-gray-900">
+                  {(c.first_name || c.firstName || '') + ' ' + (c.last_name || c.lastName || '')}
+                </div>
+                <div className="text-sm text-gray-600">{c.role_or_note || c.role || ''}</div>
+                {c.email && (
+                  <div className="text-sm text-gray-700 flex items-center gap-2 mt-1">
+                    <Mail className="h-4 w-4" />
+                    {c.email}
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Logistics */}
+      {(client.deliverablesLogistics || client.keyMeetingsSchedule) && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Logistics</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {client.deliverablesLogistics && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Deliverables & Logistics</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{client.deliverablesLogistics}</p>
+              </div>
+            )}
+            {client.keyMeetingsSchedule && (
+              <div>
+                <h3 className="text-sm font-medium text-gray-500 mb-1">Key Meetings Schedule</h3>
+                <p className="text-gray-700 whitespace-pre-wrap">{client.keyMeetingsSchedule}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Transcriptions */}
       {client.transcriptions && client.transcriptions.length > 0 && (
         <Card>

@@ -91,6 +91,41 @@ export class ClientResponseDto {
   timeline?: string;
 
   @ApiProperty({
+    description: 'Budget note or additional context',
+    example: 'Budget is flexible if ROI is demonstrated within 6 months',
+    required: false,
+  })
+  budgetNote?: string;
+
+  @ApiProperty({
+    description: 'Timeline note with commitments or constraints',
+    example: 'Must be completed before Q4 product launch',
+    required: false,
+  })
+  timelineNote?: string;
+
+  @ApiProperty({
+    description: 'Additional contacts array with name, email, role',
+    example: [{ name: 'Jane Smith', email: 'jane@acmecorp.com', role: 'CTO' }],
+    required: false,
+  })
+  additionalContacts?: any;
+
+  @ApiProperty({
+    description: 'Deliverables and logistics details',
+    example: 'Weekly progress reports, monthly steering committee meetings',
+    required: false,
+  })
+  deliverablesLogistics?: string;
+
+  @ApiProperty({
+    description: 'Key meetings schedule and important dates',
+    example: 'Kick-off: Jan 15, Mid-point review: Feb 15, Final delivery: Mar 15',
+    required: false,
+  })
+  keyMeetingsSchedule?: string;
+
+  @ApiProperty({
     description: 'HubSpot deal ID for CRM integration',
     example: '12345678',
     required: false,
