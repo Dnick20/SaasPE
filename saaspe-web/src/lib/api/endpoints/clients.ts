@@ -14,6 +14,11 @@ export interface Client {
   currentTools?: string[];
   budget?: string;
   timeline?: string;
+  budgetNote?: string;
+  timelineNote?: string;
+  additionalContacts?: any;
+  deliverablesLogistics?: string;
+  keyMeetingsSchedule?: string;
   hubspotDealId?: string;
   status: 'prospect' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
   created: string;
