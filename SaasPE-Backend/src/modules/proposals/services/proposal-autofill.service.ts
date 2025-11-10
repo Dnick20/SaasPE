@@ -397,7 +397,7 @@ export class ProposalAutofillService {
       existingSections: {
         executiveSummary: proposal.executiveSummary || undefined,
         objectivesAndOutcomes: proposal.objectivesAndOutcomes || undefined,
-        scopeOfWork: proposal.scopeOfWork || undefined,
+        scopeOfWork: proposal.scopeOfWork as any,
         deliverables: proposal.deliverables as any,
         approachAndTools: proposal.approachAndTools || undefined,
         scope: proposal.timeline as any,
