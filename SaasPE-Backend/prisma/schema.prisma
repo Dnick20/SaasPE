@@ -345,13 +345,18 @@ model Proposal {
   // AI-Generated Sections
   executiveSummary      String? // High-level overview of proposal
   objectivesAndOutcomes String? // Clear objectives and expected outcomes
-  scopeOfWork           String? // Detailed scope description
+  scopeOfWork           Json?   // Array of work items: [{ title, objective, keyActivities[], outcome }]
   deliverables          Json?   // Array of deliverable items with descriptions
   approachAndTools      String? // Methodology, process, and tools to be used
   timeline              Json?   // Project timeline (phases and dates)
   pricing               Json?   // { items: [{name, description, price}], total }
   paymentTerms          String? // Payment terms and conditions
   cancellationNotice    String? // Cancellation policy
+
+  // Enhanced Sections (Theme-based Structure)
+  keyPriorities          Json?   // Array of 3-6 priority bullets
+  nextSteps              Json?   // Array of 3-5 action items
+  proposedProjectPhases  Json?   // Array of 2-3 detailed project phases with estimatedHours
 
   // Enhanced Proposal Sections (Proposal V2)
   accountHierarchy   Json? // Organizational structure and stakeholder mapping

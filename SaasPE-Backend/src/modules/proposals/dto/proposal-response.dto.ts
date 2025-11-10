@@ -61,10 +61,10 @@ export class ProposalResponseDto {
   objectivesAndOutcomes?: string;
 
   @ApiProperty({
-    description: 'Scope of work',
+    description: 'Scope of work - array of work items with title, objective, keyActivities, and outcome',
     required: false,
   })
-  scopeOfWork?: string;
+  scopeOfWork?: any;
 
   @ApiProperty({
     description: 'Deliverables',
@@ -95,6 +95,25 @@ export class ProposalResponseDto {
     required: false,
   })
   cancellationNotice?: string;
+
+  // Enhanced Sections (Theme-based Structure)
+  @ApiProperty({
+    description: 'Key priorities - array of 3-6 priority bullets',
+    required: false,
+  })
+  keyPriorities?: any;
+
+  @ApiProperty({
+    description: 'Next steps - array of 3-5 action items',
+    required: false,
+  })
+  nextSteps?: any;
+
+  @ApiProperty({
+    description: 'Proposed project phases - array of 2-3 detailed phases with estimatedHours',
+    required: false,
+  })
+  proposedProjectPhases?: any;
 
   @ApiProperty({
     description: 'Pricing structure',
