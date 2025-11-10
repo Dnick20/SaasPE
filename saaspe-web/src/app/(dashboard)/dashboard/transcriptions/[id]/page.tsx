@@ -32,7 +32,21 @@ export default function TranscriptionDetailPage({ params }: TranscriptionDetailP
   const { data: transcription, isLoading, error } = useQuery({
     queryKey: ['transcription', id],
     queryFn: () => transcriptionsApi.getOne(id),
+    retry: (failureCount, error) => {
+      // Don't retry if it's a 404
+      if (error instanceof AxiosError && error.response?.status === 404) {
+        return false;
+      }
+      return failureCount < 3;
+    },
   });
+
+  // Redirect if transcription not found
+  if (error instanceof AxiosError && error.response?.status === 404) {
+    toast.error('Transcription not found');
+    router.push('/dashboard/transcriptions');
+    return null;
+  }
 
   const handleCreateProposal = () => {
     // Navigate to the proposal creation page with transcription info pre-filled
@@ -66,6 +80,13 @@ export default function TranscriptionDetailPage({ params }: TranscriptionDetailP
       router.push('/dashboard/transcriptions');
     },
     onError: (error) => {
+      // If it's a 404, treat it as success since the transcription is already gone
+      if (error instanceof AxiosError && error.response?.status === 404) {
+        toast.success('Transcription deleted successfully');
+        router.push('/dashboard/transcriptions');
+        return;
+      }
+
       const message = error instanceof AxiosError
         ? error.response?.data?.message || 'Failed to delete transcription'
         : 'Failed to delete transcription';

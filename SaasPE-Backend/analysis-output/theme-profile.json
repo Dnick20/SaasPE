@@ -1,0 +1,296 @@
+{
+  "companyName": "WarmUp",
+  "industry": "B2B SaaS / Demand Generation",
+  "tone": {
+    "primary": "confident",
+    "characteristics": [
+      "formal",
+      "friendly",
+      "consultative",
+      "confident",
+      "collaborative"
+    ],
+    "formality": "professional-friendly",
+    "voice": "consultative and confident"
+  },
+  "structure": {
+    "preferredSectionOrder": [
+      "overview",
+      "executiveSummary",
+      "objectivesAndOutcomes",
+      "scopeOfWork",
+      "deliverables",
+      "approachAndTools",
+      "timeline",
+      "pricing",
+      "paymentTerms",
+      "cancellationNotice"
+    ],
+    "avgSectionLengths": {
+      "unknown": 26,
+      "pricing": 57,
+      "overview": 39,
+      "timeline": 57,
+      "scopeOfWork": 171,
+      "paymentTerms": 26,
+      "cancellationNotice": 157,
+      "approachAndTools": 114,
+      "deliverables": 34,
+      "objectivesAndOutcomes": 334
+    },
+    "usesTableOfContents": true,
+    "usesCoverPage": true
+  },
+  "pricing": {
+    "style": "transparent and itemized",
+    "terminology": [
+      "investment",
+      "pricing",
+      "fee structure"
+    ],
+    "includesBreakdown": true,
+    "showsROI": true
+  },
+  "scopeOfWorkStructure": {
+    "format": "array of detailed work items",
+    "minItems": 4,
+    "maxItems": 6,
+    "itemStructure": {
+      "title": "string - work item title",
+      "objective": "string - goal statement mentioning client",
+      "keyActivities": "array of 3+ action-led activities",
+      "outcome": "string - expected result"
+    },
+    "verbStyle": "action-led, no fluff",
+    "example": {
+      "title": "HubSpot CRM Implementation",
+      "objective": "Implement a unified CRM tailored to client needs",
+      "keyActivities": [
+        "Configure HubSpot CRM to centralize customer data and improve pipeline visibility.",
+        "Integrate HubSpot with Clay.com for data flow and prospecting insights.",
+        "Create customized dashboards and reporting tailored to KPIs."
+      ],
+      "outcome": "Improved collaboration, transparency, and efficiency across the sales team."
+    }
+  },
+  "executiveSummaryRequirements": {
+    "length": "2-3 paragraphs",
+    "firstParagraphWords": {"min": 40, "max": 60},
+    "tone": "consultative, transparent",
+    "mustInclude": {
+      "triggers": "data-driven triggers (funding rounds, leadership changes, etc.)",
+      "channels": [
+        "outbound email",
+        "LinkedIn prospecting & content",
+        "calls to high-intent signals"
+      ],
+      "tools": [
+        "HeyReach.io",
+        "RB2B.com",
+        "Clay.com",
+        "Smartlead.ai",
+        "HubSpot"
+      ]
+    },
+    "style": "cite tools where applicable, mention specific trigger types"
+  },
+  "phrasingPreferences": {
+    "use": [
+      "partnership",
+      "together",
+      "proven approach",
+      "tailored solution",
+      "transparent pricing"
+    ],
+    "avoid": [
+      "cheap",
+      "quick fix",
+      "guaranteed results",
+      "one-size-fits-all"
+    ]
+  },
+  "formattingPreferences": {
+    "headingStyle": "title-case",
+    "usesBulletPoints": true,
+    "usesNumberedLists": true,
+    "emphasizesKeyPoints": true
+  },
+  "timelineFormat": {
+    "structure": "dual-table",
+    "requiresBothArrays": true,
+    "workItemsFormat": {
+      "fields": ["workItem", "description", "owner", "weeks"],
+      "ownerOptions": ["WarmUp", "Client", "WarmUp and Client"],
+      "weeksFormat": "Week X–Y or Weeks X–Y",
+      "descriptionStyle": "concise, action-oriented"
+    },
+    "phasesFormat": {
+      "fields": ["phase", "weeks", "tasks"],
+      "weeksFormat": "Week X–Y or Weeks X–Y",
+      "tasksStyle": "short, action-led bullet points",
+      "phaseNaming": "descriptive phase names (e.g., Discovery and Planning)"
+    },
+    "totalRows": {
+      "min": 6,
+      "max": 10,
+      "combined": "across both workItems and phases arrays"
+    },
+    "exampleWorkItem": {
+      "workItem": "Email Infrastructure Setup",
+      "description": "Buy domains, set mailboxes, warmup accounts…",
+      "owner": "WarmUp",
+      "weeks": "Week 1–2"
+    },
+    "examplePhase": {
+      "phase": "Discovery and Planning",
+      "weeks": "Weeks 1–2",
+      "tasks": [
+        "Kickoff meeting, system audit, confirm KPIs, finalize plan"
+      ]
+    }
+  },
+  "coverPageFormat": {
+    "includesOrderForm": true,
+    "requiredFields": {
+      "client": {
+        "fields": ["name", "primaryContacts"],
+        "primaryContactsType": "array of strings"
+      },
+      "preparedBy": {
+        "fields": ["name", "email"],
+        "emailFormat": "valid email address"
+      },
+      "commercials": {
+        "fields": ["costPerMonth", "currency", "billingCadence"],
+        "costPerMonthType": "number (no $ symbol)",
+        "currencyType": "string (e.g., USD, EUR)",
+        "billingCadenceEnum": ["monthly", "annual"]
+      },
+      "term": {
+        "fields": ["startDate", "endDate", "durationMonths"],
+        "dateFormat": "ISO-8601 (YYYY-MM-DD)",
+        "durationMonthsType": "number calculated from dates"
+      }
+    },
+    "validation": {
+      "startDateBeforeEndDate": true,
+      "durationMonthsMatchesDates": true,
+      "costPerMonthIsNumber": true,
+      "billingCadenceInEnum": true
+    },
+    "example": {
+      "client": {
+        "name": "Sonicu",
+        "primaryContacts": ["Joe Mundell", "Bryan Mitchell"]
+      },
+      "preparedBy": {
+        "name": "Mike Hurley",
+        "email": "mike@sendwarmup.com"
+      },
+      "commercials": {
+        "costPerMonth": 5500,
+        "currency": "USD",
+        "billingCadence": "monthly"
+      },
+      "term": {
+        "startDate": "2025-03-10",
+        "endDate": "2025-06-10",
+        "durationMonths": 3
+      }
+    }
+  },
+  "tableOfContentsFormat": {
+    "required": true,
+    "structure": "array of TOC entries",
+    "entryFields": {
+      "title": "string - section title",
+      "page": "number or null (null in preview, filled by PDF renderer)"
+    },
+    "defaultSections": [
+      "Overview",
+      "Key Priorities",
+      "Proposed Project Phases",
+      "Pricing Options",
+      "Next Steps",
+      "Payment Terms",
+      "Cancellation Notice"
+    ],
+    "example": [
+      { "title": "Overview", "page": null },
+      { "title": "Key Priorities", "page": null },
+      { "title": "Proposed Project Phases", "page": null },
+      { "title": "Pricing Options", "page": null },
+      { "title": "Next Steps", "page": null },
+      { "title": "Payment Terms", "page": null },
+      { "title": "Cancellation Notice", "page": null }
+    ]
+  },
+  "additionalSections": {
+    "keyPriorities": {
+      "description": "Array of 3-6 priority bullets",
+      "style": "between Objectives and Deliverables",
+      "minItems": 3,
+      "maxItems": 6,
+      "bulletStyle": "concise, outcome-focused",
+      "example": [
+        "Generate 6-8 qualified leads per month through targeted outbound",
+        "Establish thought leadership via LinkedIn content strategy",
+        "Build scalable email infrastructure for long-term growth"
+      ]
+    },
+    "nextSteps": {
+      "description": "Array of 3-5 action items",
+      "minItems": 3,
+      "maxItems": 5,
+      "bulletStyle": "action-led with optional owner and timeframe",
+      "example": [
+        "Review and approve this proposal by [Date]",
+        "Schedule kickoff meeting (Client)",
+        "Provide brand assets and messaging docs (Client, Week 1)",
+        "Begin domain and mailbox setup (WarmUp, Week 1)"
+      ]
+    },
+    "proposedProjectPhases": {
+      "description": "Detailed project phases with focus, activities, and time estimates",
+      "minItems": 2,
+      "maxItems": 3,
+      "structure": {
+        "phase": "string - phase name (e.g., Phase 1: Launch)",
+        "commitment": "string - commitment duration (optional)",
+        "window": "string - time window (e.g., Months 1-3)",
+        "focus": "string - focus area description",
+        "bullets": "array of 2-4 activity descriptions",
+        "estimatedHours": {
+          "perMonth": "number - hours per month",
+          "perWeek": "number - hours per week"
+        }
+      },
+      "bulletStyle": "detailed, specific activities with outcomes",
+      "example": [
+        {
+          "phase": "Phase 1: Launch",
+          "commitment": "3-Month Commitment",
+          "window": "Months 1-3",
+          "focus": "Foundational projects with high ROI and operational efficiency",
+          "bullets": [
+            "Customer Expansion: Identify top expansion opportunities within existing accounts. Enrich contact lists and segment outreach by department and location. Build automated email and task workflows in HubSpot.",
+            "Partner Campaigns: Segment partner accounts by type and value. Create tailored outreach sequences for each segment.",
+            "Lead Scoring: Implement lead scoring workflows in HubSpot. Create task triggers for high-priority leads."
+          ],
+          "estimatedHours": {"perMonth": 40, "perWeek": 10}
+        },
+        {
+          "phase": "Phase 2: Optimization and Scale",
+          "commitment": "",
+          "window": "Months 4-6",
+          "focus": "Expand successful campaigns and add new initiatives",
+          "bullets": [
+            "Inbound Lead Optimization: Connect RB2B.com with Clay and HubSpot. Automate enrichment and task creation for inbound leads.",
+            "Job Change Monitoring: Monitor job changes for key decision-makers; automate personalized outreach on role changes."
+          ],
+          "estimatedHours": {"perMonth": 50, "perWeek": 12}
+        }
+      ]
+    }
+  }
+}

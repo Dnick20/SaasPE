@@ -83,15 +83,24 @@ interface ProposalContent {
  * Used across prompts, validation, and database mapping
  */
 const PROPOSAL_SECTION_KEYS = {
+  // Cover Page & TOC
+  COVER_PAGE_DATA: 'coverPageData',
+  TABLE_OF_CONTENTS: 'tableOfContents',
+  // Main Content Sections
   OVERVIEW: 'overview',
   EXECUTIVE_SUMMARY: 'executiveSummary',
+  KEY_PRIORITIES: 'keyPriorities',
   OBJECTIVES_AND_OUTCOMES: 'objectivesAndOutcomes',
   SCOPE_OF_WORK: 'scopeOfWork',
   DELIVERABLES: 'deliverables',
   APPROACH_AND_TOOLS: 'approachAndTools',
+  // Timeline & Phases
   TIMELINE: 'timeline',
+  PROPOSED_PROJECT_PHASES: 'proposedProjectPhases',
+  // Pricing & Terms
   PRICING: 'pricing',
   PAYMENT_TERMS: 'paymentTerms',
+  NEXT_STEPS: 'nextSteps',
   CANCELLATION_NOTICE: 'cancellationNotice',
 } as const;
 
@@ -107,6 +116,77 @@ const PROPOSAL_GENERATION_SCHEMA = {
     schema: {
       type: 'object',
       properties: {
+        [PROPOSAL_SECTION_KEYS.COVER_PAGE_DATA]: {
+          type: 'object',
+          description: 'Order form data for cover page',
+          properties: {
+            client: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Client company name' },
+                primaryContacts: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Array of primary contact names',
+                  minItems: 1,
+                },
+              },
+              required: ['name', 'primaryContacts'],
+              additionalProperties: false,
+            },
+            preparedBy: {
+              type: 'object',
+              properties: {
+                name: { type: 'string', description: 'Preparer name' },
+                email: { type: 'string', description: 'Valid email address' },
+              },
+              required: ['name', 'email'],
+              additionalProperties: false,
+            },
+            commercials: {
+              type: 'object',
+              properties: {
+                costPerMonth: { type: 'number', description: 'Monthly cost as number (no $ symbol)' },
+                currency: { type: 'string', description: 'Currency code (e.g., USD, EUR)' },
+                billingCadence: {
+                  type: 'string',
+                  enum: ['monthly', 'annual'],
+                  description: 'Billing frequency',
+                },
+              },
+              required: ['costPerMonth', 'currency', 'billingCadence'],
+              additionalProperties: false,
+            },
+            term: {
+              type: 'object',
+              properties: {
+                startDate: { type: 'string', description: 'Start date in ISO-8601 format (YYYY-MM-DD)' },
+                endDate: { type: 'string', description: 'End date in ISO-8601 format (YYYY-MM-DD)' },
+                durationMonths: { type: 'number', description: 'Duration in months (calculated from dates)' },
+              },
+              required: ['startDate', 'endDate', 'durationMonths'],
+              additionalProperties: false,
+            },
+          },
+          required: ['client', 'preparedBy', 'commercials', 'term'],
+          additionalProperties: false,
+        },
+        [PROPOSAL_SECTION_KEYS.TABLE_OF_CONTENTS]: {
+          type: 'array',
+          description: 'Table of contents entries',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Section title' },
+              page: {
+                type: ['number', 'null'],
+                description: 'Page number (null in preview, filled by PDF renderer)',
+              },
+            },
+            required: ['title', 'page'],
+            additionalProperties: false,
+          },
+        },
         [PROPOSAL_SECTION_KEYS.OVERVIEW]: {
           type: 'string',
           description: 'Brief overview summary for cover page (2-3 sentences)',
@@ -115,13 +195,38 @@ const PROPOSAL_GENERATION_SCHEMA = {
           type: 'string',
           description: 'High-level proposal summary emphasizing value and ROI',
         },
+        [PROPOSAL_SECTION_KEYS.KEY_PRIORITIES]: {
+          type: 'array',
+          description: 'Array of 3-6 priority bullets, concise and outcome-focused',
+          items: { type: 'string' },
+          minItems: 3,
+          maxItems: 6,
+        },
         [PROPOSAL_SECTION_KEYS.OBJECTIVES_AND_OUTCOMES]: {
           type: 'string',
           description: 'Clear objectives and expected business outcomes',
         },
         [PROPOSAL_SECTION_KEYS.SCOPE_OF_WORK]: {
-          type: 'string',
-          description: 'Detailed work to be performed with specific tasks',
+          type: 'array',
+          description: 'Array of 4-6 detailed work items with objectives and activities',
+          items: {
+            type: 'object',
+            properties: {
+              title: { type: 'string', description: 'Work item title' },
+              objective: { type: 'string', description: 'Goal statement mentioning client' },
+              keyActivities: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Action-led activities (minimum 3)',
+                minItems: 3,
+              },
+              outcome: { type: 'string', description: 'Expected result' },
+            },
+            required: ['title', 'objective', 'keyActivities', 'outcome'],
+            additionalProperties: false,
+          },
+          minItems: 4,
+          maxItems: 6,
         },
         [PROPOSAL_SECTION_KEYS.DELIVERABLES]: {
           type: 'string',
@@ -132,8 +237,86 @@ const PROPOSAL_GENERATION_SCHEMA = {
           description: 'Methodology, approach, and technologies to be used',
         },
         [PROPOSAL_SECTION_KEYS.TIMELINE]: {
-          type: 'string',
-          description: 'Project schedule with phases and milestones',
+          type: 'object',
+          description: 'Project timeline with work items and phases in structured format',
+          properties: {
+            workItems: {
+              type: 'array',
+              description: 'Specific work items with ownership and timing',
+              items: {
+                type: 'object',
+                properties: {
+                  workItem: { type: 'string', description: 'Work item name' },
+                  description: { type: 'string', description: 'Concise, action-oriented description' },
+                  owner: {
+                    type: 'string',
+                    enum: ['WarmUp', 'Client', 'WarmUp and Client'],
+                    description: 'Responsible party'
+                  },
+                  weeks: { type: 'string', description: 'Timeline in format "Week X–Y" or "Weeks X–Y"' },
+                },
+                required: ['workItem', 'description', 'owner', 'weeks'],
+                additionalProperties: false,
+              },
+              minItems: 3,
+              maxItems: 6,
+            },
+            phases: {
+              type: 'array',
+              description: 'Project phases with tasks',
+              items: {
+                type: 'object',
+                properties: {
+                  phase: { type: 'string', description: 'Phase name (e.g., Discovery and Planning)' },
+                  weeks: { type: 'string', description: 'Timeline in format "Week X–Y" or "Weeks X–Y"' },
+                  tasks: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Short, action-led tasks for this phase'
+                  },
+                },
+                required: ['phase', 'weeks', 'tasks'],
+                additionalProperties: false,
+              },
+              minItems: 3,
+              maxItems: 5,
+            },
+          },
+          required: ['workItems', 'phases'],
+          additionalProperties: false,
+        },
+        [PROPOSAL_SECTION_KEYS.PROPOSED_PROJECT_PHASES]: {
+          type: 'array',
+          description: 'Detailed project phases with focus, activities, and time estimates (2-3 phases)',
+          items: {
+            type: 'object',
+            properties: {
+              phase: { type: 'string', description: 'Phase name (e.g., Phase 1: Launch)' },
+              commitment: { type: 'string', description: 'Commitment duration (optional, can be empty string)' },
+              window: { type: 'string', description: 'Time window (e.g., Months 1-3)' },
+              focus: { type: 'string', description: 'Focus area description' },
+              bullets: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Detailed activity descriptions (2-4 bullets)',
+                minItems: 2,
+                maxItems: 4,
+              },
+              estimatedHours: {
+                type: 'object',
+                properties: {
+                  perMonth: { type: 'number', description: 'Hours per month' },
+                  perWeek: { type: 'number', description: 'Hours per week' },
+                },
+                required: ['perMonth', 'perWeek'],
+                additionalProperties: false,
+              },
+            },
+            required: ['phase', 'commitment', 'window', 'focus', 'bullets', 'estimatedHours'],
+            additionalProperties: false,
+          },
+          minItems: 2,
+          maxItems: 3,
         },
         [PROPOSAL_SECTION_KEYS.PRICING]: {
           type: 'object',
@@ -161,21 +344,33 @@ const PROPOSAL_GENERATION_SCHEMA = {
           type: 'string',
           description: 'Payment schedule and terms of engagement',
         },
+        [PROPOSAL_SECTION_KEYS.NEXT_STEPS]: {
+          type: 'array',
+          description: 'Array of 3-5 action items with optional owner and timeframe',
+          items: { type: 'string' },
+          minItems: 3,
+          maxItems: 5,
+        },
         [PROPOSAL_SECTION_KEYS.CANCELLATION_NOTICE]: {
           type: 'string',
           description: 'Cancellation policy and notice requirements',
         },
       },
       required: [
+        PROPOSAL_SECTION_KEYS.COVER_PAGE_DATA,
+        PROPOSAL_SECTION_KEYS.TABLE_OF_CONTENTS,
         PROPOSAL_SECTION_KEYS.OVERVIEW,
         PROPOSAL_SECTION_KEYS.EXECUTIVE_SUMMARY,
+        PROPOSAL_SECTION_KEYS.KEY_PRIORITIES,
         PROPOSAL_SECTION_KEYS.OBJECTIVES_AND_OUTCOMES,
         PROPOSAL_SECTION_KEYS.SCOPE_OF_WORK,
         PROPOSAL_SECTION_KEYS.DELIVERABLES,
         PROPOSAL_SECTION_KEYS.APPROACH_AND_TOOLS,
         PROPOSAL_SECTION_KEYS.TIMELINE,
+        PROPOSAL_SECTION_KEYS.PROPOSED_PROJECT_PHASES,
         PROPOSAL_SECTION_KEYS.PRICING,
         PROPOSAL_SECTION_KEYS.PAYMENT_TERMS,
+        PROPOSAL_SECTION_KEYS.NEXT_STEPS,
         PROPOSAL_SECTION_KEYS.CANCELLATION_NOTICE,
       ],
       additionalProperties: false,
@@ -1335,29 +1530,180 @@ Generate a proposal.`;
         messages.push({ role: 'user', content: exampleUserPrompt });
 
         const exampleAssistantResponse = {
+          coverPageData: example.coverPageData || {
+            client: {
+              name: clientData.companyName || 'Client Company',
+              primaryContacts: [clientData.contactPerson || 'Contact Name'],
+            },
+            preparedBy: {
+              name: 'WarmUp Team',
+              email: 'team@sendwarmup.com',
+            },
+            commercials: {
+              costPerMonth: 5000,
+              currency: 'USD',
+              billingCadence: 'monthly',
+            },
+            term: {
+              startDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              endDate: new Date(Date.now() + 97 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+              durationMonths: 3,
+            },
+          },
+          tableOfContents: example.tableOfContents || [
+            { title: 'Overview', page: null },
+            { title: 'Key Priorities', page: null },
+            { title: 'Objectives and Outcomes', page: null },
+            { title: 'Scope of Work', page: null },
+            { title: 'Deliverables', page: null },
+            { title: 'Approach and Tools', page: null },
+            { title: 'Timeline', page: null },
+            { title: 'Proposed Project Phases', page: null },
+            { title: 'Pricing', page: null },
+            { title: 'Payment Terms', page: null },
+            { title: 'Next Steps', page: null },
+            { title: 'Cancellation Notice', page: null },
+          ],
           overview:
             example.coverPageData?.summary ||
             'Brief overview of the engagement and value proposition.',
           executiveSummary:
             example.executiveSummary ||
-            'Professional executive summary highlighting value proposition.',
+            `WarmUp specializes in helping B2B companies build predictable pipeline through intelligent outbound strategies. We leverage data-driven triggers like funding rounds, leadership changes, and intent signals to identify high-value prospects at the right moment.
+
+Our approach combines multiple channels—outbound email, LinkedIn prospecting and content, and calls to high-intent signals—to create a comprehensive demand generation system. Using tools like HeyReach.io, RB2B.com, Clay.com, Smartlead.ai, and HubSpot, we automate prospecting workflows while maintaining personalization at scale.
+
+This proposal outlines a phased approach to build ${clientData.companyName || 'your'} revenue engine, starting with foundational campaigns and scaling based on proven performance.`,
+          keyPriorities: example.keyPriorities || [
+            'Generate qualified leads through targeted outbound campaigns',
+            'Establish thought leadership and brand visibility',
+            'Build scalable infrastructure for long-term growth',
+          ],
           objectivesAndOutcomes:
             example.objectivesAndOutcomes ||
             'Clear objectives and expected business outcomes.',
-          scopeOfWork:
-            example.scopeOfWork ||
-            'Detailed scope of work and deliverables.',
+          scopeOfWork: example.scopeOfWork || [
+            {
+              title: 'HubSpot CRM Implementation',
+              objective: `Implement a unified CRM tailored to ${clientData.companyName || 'Client'}`,
+              keyActivities: [
+                'Configure HubSpot CRM to centralize customer data and improve pipeline visibility.',
+                'Integrate HubSpot with Clay.com for data flow and prospecting insights.',
+                'Create customized dashboards and reporting tailored to KPIs.',
+              ],
+              outcome: 'Improved collaboration, transparency, and efficiency across the sales team.',
+            },
+            {
+              title: 'Outbound Campaign Development',
+              objective: 'Build targeted outbound campaigns using data-driven triggers',
+              keyActivities: [
+                'Identify ideal customer profiles and high-value target accounts.',
+                'Set up automated sequences in Smartlead.ai for personalized outreach.',
+                'Monitor campaign performance and optimize based on engagement metrics.',
+              ],
+              outcome: 'Increased qualified pipeline through systematic outbound prospecting.',
+            },
+            {
+              title: 'LinkedIn Prospecting Strategy',
+              objective: 'Establish thought leadership and generate inbound interest via LinkedIn',
+              keyActivities: [
+                'Develop LinkedIn content strategy with weekly posts and engagement plan.',
+                'Implement HeyReach.io for automated connection requests and follow-ups.',
+                'Track engagement metrics and refine messaging based on response rates.',
+              ],
+              outcome: 'Enhanced brand visibility and increased warm inbound conversations.',
+            },
+            {
+              title: 'Lead Enrichment and Scoring',
+              objective: 'Automate lead qualification and prioritization processes',
+              keyActivities: [
+                'Connect RB2B.com to identify anonymous website visitors and intent signals.',
+                'Use Clay.com to enrich lead data with firmographics and technographics.',
+                'Build lead scoring models in HubSpot based on engagement and fit.',
+              ],
+              outcome: 'Sales team focuses on highest-priority opportunities with complete context.',
+            },
+          ],
           deliverables:
             example.deliverables ||
             'List of specific deliverables and tangible outputs.',
           approachAndTools:
             example.approachAndTools ||
             'Methodology, approach, and tools to be used.',
-          timeline: example.timeline || 'Realistic timeline with milestones.',
+          timeline: example.timeline || {
+            workItems: [
+              {
+                workItem: 'Email Infrastructure Setup',
+                description: 'Buy domains, set mailboxes, warmup accounts…',
+                owner: 'WarmUp',
+                weeks: 'Week 1–2',
+              },
+              {
+                workItem: 'Campaign Development',
+                description: 'Create messaging, templates, and sequences',
+                owner: 'WarmUp and Client',
+                weeks: 'Weeks 2–3',
+              },
+              {
+                workItem: 'Launch and Optimization',
+                description: 'Deploy campaigns and monitor performance',
+                owner: 'WarmUp',
+                weeks: 'Weeks 3–4',
+              },
+            ],
+            phases: [
+              {
+                phase: 'Discovery and Planning',
+                weeks: 'Weeks 1–2',
+                tasks: ['Kickoff meeting, system audit, confirm KPIs, finalize plan'],
+              },
+              {
+                phase: 'Implementation',
+                weeks: 'Weeks 2–4',
+                tasks: ['Setup infrastructure, develop content, configure tools'],
+              },
+              {
+                phase: 'Launch and Optimization',
+                weeks: 'Weeks 4–6',
+                tasks: ['Deploy campaigns, monitor results, optimize performance'],
+              },
+            ],
+          },
+          proposedProjectPhases: example.proposedProjectPhases || [
+            {
+              phase: 'Phase 1: Launch',
+              commitment: '3-Month Commitment',
+              window: 'Months 1-3',
+              focus: 'Foundational projects with high ROI and operational efficiency',
+              bullets: [
+                'Customer Expansion: Identify top expansion opportunities within existing accounts. Enrich contact lists and segment outreach by department and location. Build automated email and task workflows in HubSpot.',
+                'Partner Campaigns: Segment partner accounts by type and value. Create tailored outreach sequences for each segment.',
+                'Lead Scoring: Implement lead scoring workflows in HubSpot. Create task triggers for high-priority leads.',
+              ],
+              estimatedHours: { perMonth: 40, perWeek: 10 },
+            },
+            {
+              phase: 'Phase 2: Optimization and Scale',
+              commitment: '',
+              window: 'Months 4-6',
+              focus: 'Expand successful campaigns and add new initiatives',
+              bullets: [
+                'Inbound Lead Optimization: Connect RB2B.com with Clay and HubSpot. Automate enrichment and task creation for inbound leads.',
+                'Job Change Monitoring: Monitor job changes for key decision-makers; automate personalized outreach on role changes.',
+              ],
+              estimatedHours: { perMonth: 50, perWeek: 12 },
+            },
+          ],
           pricing: example.pricing || 'Transparent pricing structure.',
           paymentTerms:
             example.paymentTerms ||
             'Payment schedule and terms of engagement.',
+          nextSteps: example.nextSteps || [
+            'Review and approve this proposal by [Date]',
+            'Schedule kickoff meeting (Client)',
+            'Provide brand assets and messaging docs (Client, Week 1)',
+            'Begin infrastructure setup (WarmUp, Week 1)',
+          ],
           cancellationNotice:
             example.cancellationNotice ||
             'Cancellation policy and notice requirements.',
@@ -1444,6 +1790,112 @@ The "pricing" field MUST be a JSON object with the following structure:
 - Total must equal the sum of all item prices
 - Example: {"items": [{"name": "Setup Fee", "description": "Initial setup and configuration", "price": 2500}, {"name": "Monthly Retainer", "description": "Ongoing support and management", "price": 5000}], "total": 7500}
 
+CRITICAL - TIMELINE FORMAT:
+The "timeline" field MUST be a JSON object with BOTH arrays:
+{
+  "workItems": [
+    {"workItem": "Email Infrastructure Setup", "description": "Buy domains, set mailboxes, warmup accounts…", "owner": "WarmUp", "weeks": "Week 1–2"}
+  ],
+  "phases": [
+    {"phase": "Discovery and Planning", "weeks": "Weeks 1–2", "tasks": ["Kickoff meeting, system audit, confirm KPIs, finalize plan"]}
+  ]
+}
+RULES:
+- weeks field MUST use format "Week X–Y" or "Weeks X–Y" (use en-dash –, not hyphen -)
+- owner MUST be one of: "WarmUp", "Client", or "WarmUp and Client"
+- Include 3-6 workItems and 3-5 phases (6-10 total rows)
+- Descriptions are concise and action-oriented
+- Tasks are short, action-led bullet points
+
+CRITICAL - COVER PAGE DATA FORMAT:
+The "coverPageData" field MUST be a JSON object with this structure:
+{
+  "client": {"name": "Client Company", "primaryContacts": ["Contact 1", "Contact 2"]},
+  "preparedBy": {"name": "Preparer Name", "email": "email@warmup.com"},
+  "commercials": {"costPerMonth": 5500, "currency": "USD", "billingCadence": "monthly"},
+  "term": {"startDate": "2025-03-10", "endDate": "2025-06-10", "durationMonths": 3}
+}
+RULES:
+- All dates MUST be in ISO-8601 format (YYYY-MM-DD)
+- costPerMonth MUST be a NUMBER (no $ symbol)
+- billingCadence MUST be either "monthly" or "annual"
+- startDate MUST be before endDate
+- durationMonths MUST match the calculated duration from dates
+- primaryContacts must have at least 1 contact
+
+CRITICAL - TABLE OF CONTENTS FORMAT:
+The "tableOfContents" field MUST be an array of objects:
+[
+  {"title": "Overview", "page": null},
+  {"title": "Key Priorities", "page": null}
+]
+- Each entry must have "title" (string) and "page" (null for preview)
+- Include entries for all major sections
+
+CRITICAL - KEY PRIORITIES FORMAT:
+The "keyPriorities" field MUST be an array of 3-6 strings:
+["Priority 1 description", "Priority 2 description", "Priority 3 description"]
+- Minimum 3 items, maximum 6 items
+- Each item is concise and outcome-focused (20-150 characters)
+- Focus on business outcomes, not tasks
+
+CRITICAL - NEXT STEPS FORMAT:
+The "nextSteps" field MUST be an array of 3-5 strings:
+["Review and approve this proposal by [Date]", "Schedule kickoff meeting (Client)", "Begin setup (WarmUp, Week 1)"]
+- Minimum 3 items, maximum 5 items
+- Action-led with optional owner and timeframe
+- Clear, actionable items
+
+CRITICAL - PROPOSED PROJECT PHASES FORMAT:
+The "proposedProjectPhases" field MUST be an array of 2-3 detailed phase objects:
+[
+  {
+    "phase": "Phase 1: Launch",
+    "commitment": "3-Month Commitment",
+    "window": "Months 1-3",
+    "focus": "Foundational projects with high ROI and operational efficiency",
+    "bullets": [
+      "Customer Expansion: Identify top expansion opportunities...",
+      "Partner Campaigns: Segment partner accounts by type..."
+    ],
+    "estimatedHours": {"perMonth": 40, "perWeek": 10}
+  }
+]
+RULES:
+- 2-3 phases required
+- Each phase has: phase, commitment (can be ""), window, focus, bullets (2-4), estimatedHours
+- estimatedHours MUST be numeric (perMonth and perWeek)
+- Bullets are detailed, specific activities with outcomes
+
+CRITICAL - SCOPE OF WORK FORMAT:
+The "scopeOfWork" field MUST be an array of 4-6 work items:
+[
+  {
+    "title": "HubSpot CRM Implementation",
+    "objective": "Implement a unified CRM tailored to <Client>",
+    "keyActivities": [
+      "Configure HubSpot CRM to centralize customer data and improve pipeline visibility.",
+      "Integrate HubSpot with Clay.com for data flow and prospecting insights.",
+      "Create customized dashboards and reporting tailored to KPIs."
+    ],
+    "outcome": "Improved collaboration, transparency, and efficiency across the sales team."
+  }
+]
+RULES:
+- 4-6 items required
+- Each item MUST include: title, objective, keyActivities (≥3), outcome
+- keyActivities are action-led, no fluff
+- Objective mentions client name
+
+CRITICAL - EXECUTIVE SUMMARY FORMAT:
+The "executiveSummary" field MUST include:
+- 2-3 paragraphs
+- First paragraph: 40-60 words
+- MUST mention "data-driven triggers" (funding rounds, leadership changes, etc.)
+- MUST mention channels: outbound email, LinkedIn prospecting & content, calls to high-intent signals
+- MUST cite tools where applicable: HeyReach.io, RB2B.com, Clay.com, Smartlead.ai, HubSpot
+- Tone: consultative, transparent
+
 Generate a compelling proposal following the format of the winning examples above. Return a JSON object with keys for each section.`;
 
       messages.push({ role: 'user', content: currentTaskPrompt });
@@ -1480,13 +1932,47 @@ Generate a compelling proposal following the format of the winning examples abov
 
       // Parse JSON with fallback
       const jsonSchema = `{
+  "coverPageData": {
+    "client": {"name": "string", "primaryContacts": ["string"]},
+    "preparedBy": {"name": "string", "email": "string"},
+    "commercials": {"costPerMonth": "number", "currency": "string", "billingCadence": "monthly|annual"},
+    "term": {"startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD", "durationMonths": "number"}
+  },
+  "tableOfContents": [
+    {"title": "string", "page": null}
+  ],
   "overview": "string (brief summary for cover page)",
   "executiveSummary": "string (high-level proposal summary)",
+  "keyPriorities": ["string (3-6 priority bullets)"],
   "objectivesAndOutcomes": "string (goals and expected results)",
-  "scopeOfWork": "string (detailed work to be performed)",
+  "scopeOfWork": [
+    {
+      "title": "string (work item title)",
+      "objective": "string (goal mentioning client)",
+      "keyActivities": ["string (3+ action-led activities)"],
+      "outcome": "string (expected result)"
+    }
+  ],
   "deliverables": "string (specific outputs and artifacts)",
   "approachAndTools": "string (methodology and technologies)",
-  "timeline": "string (project schedule and milestones)",
+  "timeline": {
+    "workItems": [
+      {"workItem": "string", "description": "string", "owner": "WarmUp|Client|WarmUp and Client", "weeks": "Week X–Y"}
+    ],
+    "phases": [
+      {"phase": "string", "weeks": "Weeks X–Y", "tasks": ["string"]}
+    ]
+  },
+  "proposedProjectPhases": [
+    {
+      "phase": "string (e.g., Phase 1: Launch)",
+      "commitment": "string (optional)",
+      "window": "string (e.g., Months 1-3)",
+      "focus": "string (focus area)",
+      "bullets": ["string (2-4 detailed activities)"],
+      "estimatedHours": {"perMonth": "number", "perWeek": "number"}
+    }
+  ],
   "pricing": {
     "items": [
       {
@@ -1498,6 +1984,7 @@ Generate a compelling proposal following the format of the winning examples abov
     "total": "number (sum of all item prices)"
   },
   "paymentTerms": "string (payment schedule and terms)",
+  "nextSteps": ["string (3-5 action items)"],
   "cancellationNotice": "string (cancellation policy)"
 }`;
 
