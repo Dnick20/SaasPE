@@ -5,6 +5,8 @@ import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { FileAudio, Calendar, Clock, CheckCircle2 } from 'lucide-react';
+import { transcriptionsApi, Transcription as ApiTranscription } from '@/lib/api/endpoints/transcriptions';
+import { clientsApi } from '@/lib/api/endpoints/clients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,14 +25,7 @@ const proposalSchema = z.object({
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
 
-interface Transcription {
-  id: string;
-  title: string;
-  status: string;
-  duration: number;
-  created: string;
-  transcript?: string;
-}
+// Using Transcription type from API
 
 interface Client {
   id: string;
@@ -41,7 +36,7 @@ interface Client {
 }
 
 interface TranscriptionSelectorProps {
-  clientId: string;
+  clientId?: string;
   selectedTranscriptionId: string | null;
   onTranscriptionSelect: (transcriptionId: string) => void;
   onGenerate: (data: {
@@ -65,7 +60,7 @@ export function TranscriptionSelector({
   onGenerate,
   onCancel,
 }: TranscriptionSelectorProps) {
-  const [transcriptions, setTranscriptions] = useState<Transcription[]>([]);
+  const [transcriptions, setTranscriptions] = useState<ApiTranscription[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [client, setClient] = useState<Client | null>(null);
@@ -106,41 +101,36 @@ export function TranscriptionSelector({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [transcriptionsRes, clientRes] = await Promise.all([
-          fetch(`/api/v1/transcriptions?clientId=${clientId}&status=completed&limit=50`, {
-            credentials: 'include',
-          }),
-          fetch(`/api/v1/clients/${clientId}`, {
-            credentials: 'include',
-          }),
-        ]);
 
-        if (!transcriptionsRes.ok) {
-          throw new Error('Failed to fetch transcriptions');
-        }
-        if (!clientRes.ok) {
-          throw new Error('Failed to fetch client');
-        }
+        if (clientId) {
+          // Fetch transcriptions for specific client and client data via API client
+          const [transcriptionsData, clientData] = await Promise.all([
+            transcriptionsApi.getAll(1, 50, 'completed', clientId),
+            clientsApi.getOne(clientId),
+          ]);
 
-        const [transcriptionsData, clientData] = await Promise.all([
-          transcriptionsRes.json(),
-          clientRes.json(),
-        ]);
+          setTranscriptions(transcriptionsData.data || []);
+          setClient(clientData);
 
-        setTranscriptions(transcriptionsData.data || []);
-        setClient(clientData);
+          // Auto-fill proposal title based on client company name
+          if (clientData?.companyName) {
+            setValue('title', `Proposal for ${clientData.companyName}`);
+          }
 
-        // Auto-fill proposal title based on client company name
-        if (clientData?.companyName) {
-          setValue('title', `Proposal for ${clientData.companyName}`);
-        }
+          // Auto-fill preparedFor with client contact info
+          if (clientData.contactFirstName || clientData.contactLastName) {
+            const fullName = [clientData.contactFirstName, clientData.contactLastName]
+              .filter(Boolean)
+              .join(' ');
+            setValue('preparedFor', fullName);
+          }
+        } else {
+          // Fetch all completed transcriptions (no client filter) via API client
+          const list = await transcriptionsApi.getAll(1, 50, 'completed');
+          setTranscriptions(list.data || []);
 
-        // Auto-fill preparedFor with client contact info
-        if (clientData.contactFirstName || clientData.contactLastName) {
-          const fullName = [clientData.contactFirstName, clientData.contactLastName]
-            .filter(Boolean)
-            .join(' ');
-          setValue('preparedFor', fullName);
+          // Set default proposal title
+          setValue('title', 'AI-Generated Proposal');
         }
 
         // Set default start date to today
@@ -255,12 +245,12 @@ export function TranscriptionSelector({
                   </div>
                   <div className="flex-1">
                     <h4 className="font-medium text-gray-900 mb-1">
-                      {transcription.title}
+                      {transcription.fileName}
                     </h4>
                     <div className="flex items-center gap-4 text-sm text-gray-500">
                       <span className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        {Math.floor(transcription.duration / 60)} min
+                        {transcription.duration ? Math.floor(transcription.duration / 60) : 0} min
                       </span>
                       <span className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />

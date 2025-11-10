@@ -5,15 +5,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, Sparkles, CheckCircle2 } from 'lucide-react';
 
+interface ScriptData {
+  tone: string;
+  ctas: string[];
+  emailScript?: unknown;
+  linkedInScript?: unknown;
+  coldCallScript?: unknown;
+}
+
 interface ScriptGenerationStepProps {
-  data: {
-    tone: string;
-    ctas: string[];
-    emailScript?: any;
-    linkedInScript?: any;
-    coldCallScript?: any;
-  };
-  onChange: (data: any) => void;
+  data: ScriptData;
+  onChange: (data: ScriptData) => void;
   onGenerateScripts: () => Promise<void>;
   isGenerating: boolean;
   hasGenerated: boolean;

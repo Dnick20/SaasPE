@@ -92,8 +92,10 @@ export function EmailWizard({ open, onClose, onSuccess }: EmailWizardProps) {
       toast.success('Email account added successfully!');
       handleClose();
       onSuccess?.();
-    } catch (error: any) {
-      const message = error.response?.data?.message || 'Failed to add email account';
+    } catch (error: unknown) {
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to add email account'
+        : 'Failed to add email account';
 
       // Track failed creation
       trackMailboxCreationFailed(mailboxData.provider || 'unknown', message);

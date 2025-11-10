@@ -12,6 +12,7 @@ import { CreateProposalFromTranscription } from '@/components/proposals/create-p
 import { CreateProposalForm } from '@/components/proposals/create-proposal-form';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { clientsApi } from '@/lib/api/endpoints/clients';
 
 type ProposalCreationPath = 'selection' | 'transcription' | 'manual';
 
@@ -36,13 +37,8 @@ function NewProposalContent() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const response = await fetch('/api/v1/clients?limit=100', {
-          credentials: 'include',
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setClients(data.data || []);
-        }
+        const data = await clientsApi.getAll(1, 100);
+        setClients(data.data || []);
       } catch (error) {
         console.error('Failed to fetch clients:', error);
       } finally {
@@ -60,7 +56,7 @@ function NewProposalContent() {
     );
   }
 
-  const showClientSelector = !selectedClientId || path === 'selection';
+  const showClientSelector = (!selectedClientId || path === 'selection') && path !== 'transcription';
 
   return (
     <div className="space-y-6">
@@ -88,7 +84,7 @@ function NewProposalContent() {
 
       {showClientSelector && (
         <div className="max-w-md">
-          <Label htmlFor="client">Select Client *</Label>
+          <Label htmlFor="client">Select Client (Optional for AI Generation)</Label>
           <Select value={selectedClientId || undefined} onValueChange={setSelectedClientId}>
             <SelectTrigger>
               <SelectValue placeholder="Select a client" />
@@ -107,7 +103,7 @@ function NewProposalContent() {
               <Link href="/dashboard/clients/new" className="text-blue-600 hover:underline">
                 Create a client
               </Link>{' '}
-              first.
+              first, or proceed with AI generation from transcription.
             </p>
           )}
         </div>
@@ -120,9 +116,9 @@ function NewProposalContent() {
         />
       )}
 
-      {selectedClientId && path === 'transcription' && (
+      {path === 'transcription' && (
         <CreateProposalFromTranscription
-          clientId={selectedClientId}
+          clientId={selectedClientId || undefined}
           initialTranscriptionId={urlTranscriptionId || undefined}
           onBack={() => setPath('selection')}
         />

@@ -575,7 +575,7 @@ export function CampaignWizard({ initialClientId, initialProposalId }: CampaignW
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Select one or more mailboxes to rotate sending. We will honor per‑mailbox limits and warmup caps.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-auto border rounded p-3">
-                    {mailboxesData?.data?.mailboxes?.map((m: any) => (
+                    {mailboxesData?.data?.mailboxes?.map((m: { id: string; email: string }) => (
                       <label key={m.id} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"

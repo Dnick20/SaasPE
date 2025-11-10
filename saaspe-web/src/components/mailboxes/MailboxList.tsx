@@ -40,8 +40,11 @@ export function MailboxList({ onAddMailbox }: MailboxListProps) {
     try {
       await deleteMailbox.mutateAsync(id);
       toast.success('Mailbox deleted successfully');
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete mailbox');
+    } catch (error: unknown) {
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to delete mailbox'
+        : 'Failed to delete mailbox';
+      toast.error(message);
     }
   };
 

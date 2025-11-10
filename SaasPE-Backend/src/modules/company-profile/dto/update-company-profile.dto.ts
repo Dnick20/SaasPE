@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsObject, IsIn } from 'class-validator';
+import { IsString, IsOptional, IsObject, IsIn, IsArray, ArrayMaxSize } from 'class-validator';
 
 export class UpdateCompanyProfileDto {
   @ApiProperty({
@@ -48,6 +48,39 @@ export class UpdateCompanyProfileDto {
   @IsOptional()
   @IsIn(['professional', 'casual', 'consultative', 'friendly'])
   preferredTone?: string;
+
+  @ApiProperty({
+    example: ['Product A', 'Product B', 'Product C'],
+    description: 'Top 5 products the company sells',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  productsSold?: string[];
+
+  @ApiProperty({
+    example: ['Product X', 'Product Y'],
+    description: '2-3 products the company does NOT sell',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  productsNotSold?: string[];
+
+  @ApiProperty({
+    example: ['Consulting', 'Implementation', 'Training'],
+    description: 'Top 5 services the company offers',
+    required: false,
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(5)
+  servicesSold?: string[];
 
   @ApiProperty({
     example: {

@@ -34,3 +34,27 @@ export function useAiCosts(startDate?: string, endDate?: string) {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 }
+
+export function useProposalWinRate(startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['analytics', 'proposals', 'win-rate', startDate, endDate],
+    queryFn: () => analyticsApi.getProposalWinRate(startDate, endDate),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+export function useProposalPipeline() {
+  return useQuery({
+    queryKey: ['analytics', 'proposals', 'pipeline'],
+    queryFn: () => analyticsApi.getProposalPipeline(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}
+
+export function useTimeToClose() {
+  return useQuery({
+    queryKey: ['analytics', 'proposals', 'time-to-close'],
+    queryFn: () => analyticsApi.getTimeToClose(),
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+}

@@ -24,14 +24,16 @@ const SUGGESTED_SCHEDULE = {
   dailyLimit: 50,
 };
 
+interface ScheduleValue {
+  sendDays: number[];
+  sendTimeStart: string;
+  sendTimeEnd: string;
+  timezone: string;
+}
+
 interface ScheduleSelectorProps {
-  value: {
-    sendDays: number[];
-    sendTimeStart: string;
-    sendTimeEnd: string;
-    timezone: string;
-  };
-  onChange: (value: any) => void;
+  value: ScheduleValue;
+  onChange: (value: ScheduleValue) => void;
 }
 
 export function ScheduleSelector({ value, onChange }: ScheduleSelectorProps) {

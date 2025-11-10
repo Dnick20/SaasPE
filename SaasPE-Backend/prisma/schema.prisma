@@ -1882,6 +1882,11 @@ model CompanyProfile {
   targetICP     String? @db.Text // Ideal Customer Profile description
   preferredTone String? // "professional", "friendly", "consultative", "casual"
 
+  // Products & Services
+  productsSold    String[] @default([]) // Top 5 products the company sells
+  productsNotSold String[] @default([]) // 2-3 products the company does NOT sell
+  servicesSold    String[] @default([]) // Top 5 services the company offers
+
   // Enrichment Data
   enrichmentData Json? // Data scraped from website
   scraped        Boolean  @default(false)

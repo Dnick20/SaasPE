@@ -1,8 +1,10 @@
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
-// Use relative URLs when NEXT_PUBLIC_API_URL is not set (proxied via nginx)
-// Otherwise use the specified API URL (for direct backend access)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
+// Use API base URL from env; if missing in production, fall back to public API domain
+// In development, keep relative URLs so local proxy/nginx can be used
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === 'production' ? 'https://api.saasope.com' : '');
 
 /**
  * Safe API tracking - lazy load to avoid circular dependencies

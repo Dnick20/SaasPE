@@ -116,7 +116,7 @@ export interface ProposalRevision {
   paymentTerms?: string;
   cancellationNotice?: string;
   timeline?: string;
-  pricing?: any;
+  pricing?: unknown;
   changeNote?: string;
   createdBy: string;
   createdAt: string;
@@ -582,7 +582,7 @@ export const proposalsApi = {
    */
   async seedPricingBlueprints(): Promise<{
     message: string;
-    templates: any[];
+    templates: Array<{ label: string; [key: string]: unknown }>;
     count: number;
   }> {
     const response = await apiClient.post('/api/v1/proposals/pricing-blueprints/seed');

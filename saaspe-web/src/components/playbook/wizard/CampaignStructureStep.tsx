@@ -5,21 +5,23 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 
-interface CampaignStructureStepProps {
-  data: {
-    campaignCount: number;
-    structure: {
-      phases?: string[];
-      touchpoints?: number;
-      cadence?: string;
-    };
-    campaignStrategy: {
-      channels?: string[];
-      touchpoints?: number;
-      cadence?: Record<string, number>;
-    };
+interface CampaignStructureData {
+  campaignCount: number;
+  structure: {
+    phases?: string[];
+    touchpoints?: number;
+    cadence?: string;
   };
-  onChange: (data: any) => void;
+  campaignStrategy: {
+    channels?: string[];
+    touchpoints?: number;
+    cadence?: Record<string, number>;
+  };
+}
+
+interface CampaignStructureStepProps {
+  data: CampaignStructureData;
+  onChange: (data: CampaignStructureData) => void;
 }
 
 export function CampaignStructureStep({ data, onChange }: CampaignStructureStepProps) {

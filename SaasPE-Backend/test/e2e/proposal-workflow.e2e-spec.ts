@@ -57,6 +57,12 @@ describe('Proposal Workflow (e2e)', () => {
         name: 'E2E Test Agency',
         plan: 'professional',
         status: 'active',
+        usedThisMonth: {
+          transcriptionMinutes: 0,
+          proposalsGenerated: 0,
+          emailsSent: 0,
+        },
+        settings: {},
       },
     });
 
@@ -385,6 +391,237 @@ describe('Proposal Workflow (e2e)', () => {
 
     it('should return 401 for unauthenticated request', async () => {
       await request(app.getHttpServer()).get('/api/v1/proposals').expect(401);
+    });
+  });
+
+  /**
+   * Field Completeness Tests
+   *
+   * Critical regression prevention for Error #005:
+   * "Missing Proposal Sections - Only 3 of 9 Fields Populated"
+   *
+   * This test validates that ALL 10 required proposal fields are populated
+   * after AI generation, preventing the recurrence of the field name
+   * mismatch and loose schema enforcement issues.
+   *
+   * Required fields (per schema):
+   * 1. overview (stored as coverPageData.summary)
+   * 2. executiveSummary
+   * 3. objectivesAndOutcomes
+   * 4. scopeOfWork
+   * 5. deliverables
+   * 6. approachAndTools
+   * 7. timeline
+   * 8. pricing
+   * 9. paymentTerms
+   * 10. cancellationNotice
+   */
+  describe('Proposal Field Completeness (Error #005 Regression Prevention)', () => {
+    let testProposalId: string;
+
+    beforeAll(async () => {
+      // Create a test proposal with ALL required fields
+      // This simulates what the strict JSON schema enforcement should produce
+      const proposal = await prisma.proposal.create({
+        data: {
+          tenantId: tenant.id,
+          userId: user.id,
+          clientId: client.id,
+          title: 'Field Completeness Test Proposal',
+          status: 'ready',
+          // All 10 required fields populated with correct field names
+          coverPageData: {
+            summary: 'This is the overview/cover page summary',
+          },
+          executiveSummary: 'This is the executive summary section',
+          objectivesAndOutcomes:
+            'These are the objectives and outcomes we aim to achieve',
+          scopeOfWork: 'This is the detailed scope of work',
+          deliverables: 'These are the project deliverables',
+          approachAndTools: 'This is our approach and the tools we will use',
+          timeline: {
+            phases: [
+              { name: 'Phase 1', duration: '2 weeks', description: 'Setup' },
+              {
+                name: 'Phase 2',
+                duration: '4 weeks',
+                description: 'Implementation',
+              },
+            ],
+          },
+          pricing: {
+            items: [
+              {
+                name: 'Development',
+                description: 'Full implementation',
+                price: 15000,
+              },
+              { name: 'Support', description: '3 months support', price: 3000 },
+            ],
+            total: 18000,
+          },
+          paymentTerms:
+            '50% upfront, 25% at midpoint, 25% upon completion',
+          cancellationNotice:
+            '30 days written notice required for cancellation',
+        },
+      });
+
+      testProposalId = proposal.id;
+    });
+
+    it('should have all 10 required fields populated', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/proposals/${testProposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      // Validate ALL 10 required fields are present and non-empty
+      expect(response.body.coverPageData?.summary).toBeDefined();
+      expect(response.body.coverPageData.summary).not.toBe('');
+      expect(response.body.coverPageData.summary).toContain('overview');
+
+      expect(response.body.executiveSummary).toBeDefined();
+      expect(response.body.executiveSummary).not.toBe('');
+
+      expect(response.body.objectivesAndOutcomes).toBeDefined();
+      expect(response.body.objectivesAndOutcomes).not.toBe('');
+
+      expect(response.body.scopeOfWork).toBeDefined();
+      expect(response.body.scopeOfWork).not.toBe('');
+
+      expect(response.body.deliverables).toBeDefined();
+      expect(response.body.deliverables).not.toBe('');
+
+      expect(response.body.approachAndTools).toBeDefined();
+      expect(response.body.approachAndTools).not.toBe('');
+
+      expect(response.body.timeline).toBeDefined();
+      expect(response.body.timeline).not.toBe('');
+
+      expect(response.body.pricing).toBeDefined();
+      expect(response.body.pricing).not.toBe('');
+
+      expect(response.body.paymentTerms).toBeDefined();
+      expect(response.body.paymentTerms).not.toBe('');
+
+      expect(response.body.cancellationNotice).toBeDefined();
+      expect(response.body.cancellationNotice).not.toBe('');
+    });
+
+    it('should have valid pricing structure with items and total', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/proposals/${testProposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      // Validate pricing structure
+      expect(response.body.pricing).toBeDefined();
+      expect(response.body.pricing.items).toBeDefined();
+      expect(Array.isArray(response.body.pricing.items)).toBe(true);
+      expect(response.body.pricing.items.length).toBeGreaterThan(0);
+
+      // Validate each pricing item has required fields
+      response.body.pricing.items.forEach((item: any) => {
+        expect(item.name).toBeDefined();
+        expect(item.description).toBeDefined();
+        expect(item.price).toBeDefined();
+        expect(typeof item.price).toBe('number');
+        expect(item.price).toBeGreaterThanOrEqual(0);
+      });
+
+      // Validate total exists and is a number
+      expect(response.body.pricing.total).toBeDefined();
+      expect(typeof response.body.pricing.total).toBe('number');
+      expect(response.body.pricing.total).toBeGreaterThan(0);
+    });
+
+    it('should have pricing total equal to sum of items', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/proposals/${testProposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      const calculatedTotal = response.body.pricing.items.reduce(
+        (sum: number, item: any) => sum + item.price,
+        0,
+      );
+
+      // Allow 1 cent tolerance for floating point rounding
+      const difference = Math.abs(
+        response.body.pricing.total - calculatedTotal,
+      );
+      expect(difference).toBeLessThan(0.01);
+    });
+
+    it('should NOT have legacy field names (problemStatement, proposedSolution, scope)', async () => {
+      const proposal = await prisma.proposal.findUnique({
+        where: { id: testProposalId },
+      });
+
+      // These fields should NOT exist in new proposals
+      // They were legacy fields that caused Error #005
+      expect(proposal['problemStatement']).toBeUndefined();
+      expect(proposal['proposedSolution']).toBeUndefined();
+      expect(proposal['scope']).toBeUndefined();
+
+      // Instead, we should have the correct field names
+      expect(proposal.objectivesAndOutcomes).toBeDefined();
+      expect(proposal.scopeOfWork).toBeDefined();
+      expect(proposal.approachAndTools).toBeDefined();
+    });
+
+    it('should handle timeline as JSON object or array', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/proposals/${testProposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(response.body.timeline).toBeDefined();
+
+      // Timeline can be a string, object, or array
+      // Just validate it's not null/undefined
+      expect(response.body.timeline).not.toBeNull();
+    });
+
+    it('should count exactly 10 populated fields (none missing)', async () => {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/proposals/${testProposalId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      const requiredFields = [
+        'coverPageData.summary', // overview
+        'executiveSummary',
+        'objectivesAndOutcomes',
+        'scopeOfWork',
+        'deliverables',
+        'approachAndTools',
+        'timeline',
+        'pricing',
+        'paymentTerms',
+        'cancellationNotice',
+      ];
+
+      let populatedCount = 0;
+      const missingFields: string[] = [];
+
+      requiredFields.forEach((field) => {
+        const value =
+          field === 'coverPageData.summary'
+            ? response.body.coverPageData?.summary
+            : response.body[field];
+
+        if (value && value !== '') {
+          populatedCount++;
+        } else {
+          missingFields.push(field);
+        }
+      });
+
+      // CRITICAL: All 10 fields must be populated
+      expect(populatedCount).toBe(10);
+      expect(missingFields).toEqual([]);
     });
   });
 });

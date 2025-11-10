@@ -5,7 +5,7 @@ export interface ICP {
   companySize?: string;
   roles?: string[];
   painPoints?: string[];
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface EmailScript {
@@ -41,11 +41,11 @@ export interface CreatePlaybookDto {
   linkedInScript: LinkedInScript;
   coldCallScript: ColdCallScript;
   tone: string;
-  structure: Record<string, any>;
+  structure: Record<string, unknown>;
   ctas: string[];
-  compliance?: Record<string, any>;
+  compliance?: Record<string, unknown>;
   campaignCount?: number;
-  campaignStrategy: Record<string, any>;
+  campaignStrategy: Record<string, unknown>;
   version?: number;
   isTemplate?: boolean;
   createdBy?: string;
@@ -57,11 +57,11 @@ export interface UpdatePlaybookDto {
   linkedInScript?: LinkedInScript;
   coldCallScript?: ColdCallScript;
   tone?: string;
-  structure?: Record<string, any>;
+  structure?: Record<string, unknown>;
   ctas?: string[];
-  compliance?: Record<string, any>;
+  compliance?: Record<string, unknown>;
   campaignCount?: number;
-  campaignStrategy?: Record<string, any>;
+  campaignStrategy?: Record<string, unknown>;
   googleDocUrl?: string;
   pdfS3Key?: string;
   pdfUrl?: string;
@@ -79,11 +79,11 @@ export interface PlaybookResponse {
   linkedInScript: LinkedInScript;
   coldCallScript: ColdCallScript;
   tone: string;
-  structure: Record<string, any>;
+  structure: Record<string, unknown>;
   ctas: string[];
-  compliance?: Record<string, any>;
+  compliance?: Record<string, unknown>;
   campaignCount: number;
-  campaignStrategy: Record<string, any>;
+  campaignStrategy: Record<string, unknown>;
   googleDocUrl?: string;
   pdfS3Key?: string;
   pdfUrl?: string;

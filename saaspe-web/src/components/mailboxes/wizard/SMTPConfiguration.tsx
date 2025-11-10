@@ -35,7 +35,7 @@ export function SMTPConfiguration({
     smtpUseSsl: true,
   });
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: string, value: string | number | boolean) => {
     setFormData({ ...formData, [field]: value });
   };
 

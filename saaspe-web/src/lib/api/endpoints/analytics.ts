@@ -98,6 +98,46 @@ export interface MailboxAnalytics {
   }>;
 }
 
+export interface ProposalWinRate {
+  overview: {
+    totalSent: number;
+    totalSigned: number;
+    totalWon: number;
+    totalRejected: number;
+    pending: number;
+  };
+  rates: {
+    signRate: number;
+    winRate: number;
+    lossRate: number;
+  };
+  timeSeries: Array<{
+    month: string;
+    sent: number;
+    won: number;
+    signed: number;
+    winRate: string;
+    signRate: string;
+  }>;
+}
+
+export interface ProposalPipeline {
+  stages: Array<{
+    stage: string;
+    count: number;
+    percentage: string;
+  }>;
+  total: number;
+}
+
+export interface TimeToClose {
+  averageDaysToClose: number;
+  medianDaysToClose: number;
+  fastestClose: number;
+  slowestClose: number;
+  totalClosed: number;
+}
+
 export const analyticsApi = {
   /**
    * Get dashboard overview metrics
@@ -161,6 +201,35 @@ export const analyticsApi = {
    */
   getMailboxAnalytics: async (): Promise<MailboxAnalytics> => {
     const response = await apiClient.get<MailboxAnalytics>('/api/v1/analytics/mailboxes');
+    return response.data;
+  },
+
+  /**
+   * Get proposal win rate analytics
+   */
+  getProposalWinRate: async (startDate?: string, endDate?: string): Promise<ProposalWinRate> => {
+    const response = await apiClient.get<ProposalWinRate>('/api/v1/analytics/proposals/win-rate', {
+      params: {
+        startDate,
+        endDate,
+      },
+    });
+    return response.data;
+  },
+
+  /**
+   * Get proposal pipeline visualization
+   */
+  getProposalPipeline: async (): Promise<ProposalPipeline> => {
+    const response = await apiClient.get<ProposalPipeline>('/api/v1/analytics/proposals/pipeline');
+    return response.data;
+  },
+
+  /**
+   * Get time-to-close metrics
+   */
+  getTimeToClose: async (): Promise<TimeToClose> => {
+    const response = await apiClient.get<TimeToClose>('/api/v1/analytics/proposals/time-to-close');
     return response.data;
   },
 };

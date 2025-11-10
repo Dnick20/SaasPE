@@ -1,4 +1,8 @@
 // @ts-nocheck
+// TODO: Remove this directive and fix TypeScript errors
+// Requires refactoring ProposalEditorProps to use strict typing
+// instead of [key: string]: unknown which causes multiple type errors
+// Related to Error #005 hardening - future improvement
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +44,7 @@ import { proposalsApi } from '@/lib/api/endpoints/proposals';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { downloadPdfFromUrl } from '@/lib/download-helpers';
+import { apiClient } from '@/lib/api/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -93,9 +98,37 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
   const [autoFilling, setAutoFilling] = useState(false);
   const [regeneratingSection, setRegeneratingSection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pricingOptions, setPricingOptions] = useState(proposal.pricingOptions || []);
+  const [pricingOptions, setPricingOptions] = useState<any[]>((proposal.pricingOptions as any[] | undefined) || []);
   const [catalog, setCatalog] = useState<PricingCatalogItem[]>([]);
   const [quickItems, setQuickItems] = useState<Array<{ id: string; qty: number }>>([]);
+
+  // Bridge AI-generated pricing to visual pricing editor
+  // Convert proposal.pricing (single object) to pricingOptions[0] (array format)
+  useEffect(() => {
+    // Only convert if:
+    // 1. AI-generated pricing exists
+    // 2. No manual pricing options have been set yet
+    if (proposal.pricing && pricingOptions.length === 0) {
+      const aiPricing = proposal.pricing as any;
+
+      // Validate AI pricing has expected structure
+      if (aiPricing.items && Array.isArray(aiPricing.items) && typeof aiPricing.total === 'number') {
+        const convertedPricing = {
+          name: 'AI-Generated Pricing',
+          description: 'Pricing generated from AI analysis',
+          items: aiPricing.items.map((item: any) => ({
+            name: item.name || '',
+            description: item.description || '',
+            price: typeof item.price === 'number' ? item.price : 0,
+          })),
+          total: aiPricing.total,
+          recommended: true, // Mark as recommended since it's AI-generated
+        };
+
+        setPricingOptions([convertedPricing]);
+      }
+    }
+  }, [proposal.pricing, pricingOptions.length]);
 
   const {
     register,
@@ -159,9 +192,12 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
   const { data: companyDefaults } = useQuery({
     queryKey: ['company-profile', 'defaults'],
     queryFn: async () => {
-      const resp = await fetch('/api/v1/company-profile/defaults', { credentials: 'include' });
-      if (!resp.ok) return null;
-      return resp.json();
+      try {
+        const { data } = await apiClient.get('/api/v1/company-profile/defaults');
+        return data;
+      } catch {
+        return null;
+      }
     },
   });
 
@@ -178,32 +214,15 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       setSaving(true);
       setError(null);
 
-      const response = await fetch(`/api/v1/proposals/${proposal.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          ...data,
-          timeline: Array.isArray(data.timeline) ? data.timeline : timelinePhases,
-          pricingOptions: pricingOptions,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save proposal');
-      }
+      await proposalsApi.update(proposal.id, {
+        ...data,
+        timeline: Array.isArray(data.timeline) ? data.timeline : timelinePhases,
+        pricingOptions: pricingOptions,
+      } as any);
 
       // Create a revision snapshot after successful save
       try {
-        await fetch(`/api/v1/proposals/${proposal.id}/revisions`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ changeNote: 'Manual save' }),
-        });
+        await apiClient.post(`/api/v1/proposals/${proposal.id}/revisions`, { changeNote: 'Manual save' });
       } catch (e) {
         // Non-blocking: log to console but do not interrupt UX
         console.warn('Failed to create revision snapshot', e);
@@ -231,7 +250,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       setExportingPdf(true);
 
       // Use the new Blob download endpoint
-      const pdfUrl = `/api/v1/proposals/${proposal.id}/pdf`;
+      const pdfUrl = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.saasope.com'}/api/v1/proposals/${proposal.id}/pdf`;
 
       // Generate filename from proposal data
       const clientName = (proposal.client as any)?.companyName || 'Client';
@@ -254,8 +273,11 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
     try {
       setExportingGDoc(true);
       // Check Google status first
-      const statusResp = await fetch('/api/v1/auth/google/status', { credentials: 'include' });
-      const status = statusResp.ok ? await statusResp.json() : { data: { connected: false } };
+      let status: any = { data: { connected: false } };
+      try {
+        const { data } = await apiClient.get('/api/v1/auth/google/status');
+        status = data;
+      } catch {}
       if (!status?.data?.connected) {
         const confirmConnect = window.confirm('To export to Google Docs, connect your Google account. Connect now?');
         if (confirmConnect) {
@@ -313,17 +335,9 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
     try {
       setExportingWord(true);
 
-      const response = await fetch(`/api/v1/proposals/${proposal.id}/export/word`, {
-        method: 'GET',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to export Word document');
-      }
-
-      // Get the blob from the response
-      const blob = await response.blob();
+      const { data: blob } = await apiClient.get(`/api/v1/proposals/${proposal.id}/export/word`, {
+        responseType: 'blob',
+      } as any);
 
       // Create a download link
       const url = window.URL.createObjectURL(blob);
@@ -370,17 +384,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       setAutoFilling(true);
       setError(null);
 
-      const response = await fetch(`/api/v1/proposals/${proposal.id}/auto-fill`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to auto-fill proposal');
-      }
-
-      const data = await response.json();
+      const { data } = await apiClient.post(`/api/v1/proposals/${proposal.id}/auto-fill`);
 
       // Update form values with generated content
       setValue('title', data.title || '');
@@ -413,17 +417,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       setRegeneratingSection(section);
       setError(null);
 
-      const response = await fetch(`/api/v1/proposals/${proposal.id}/sections/${section}/generate`, {
-        method: 'POST',
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to regenerate ${section}`);
-      }
-
-      const result = await response.json();
+      const { data: result } = await apiClient.post(`/api/v1/proposals/${proposal.id}/sections/${section}/generate`);
       const data = result.data;
 
       // Update the specific section

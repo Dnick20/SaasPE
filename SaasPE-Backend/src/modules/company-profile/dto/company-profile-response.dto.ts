@@ -26,6 +26,24 @@ export class CompanyProfileResponseDto {
   preferredTone?: string | null;
 
   @ApiProperty({
+    example: ['Product A', 'Product B', 'Product C'],
+    type: [String],
+  })
+  productsSold: string[];
+
+  @ApiProperty({
+    example: ['Product X', 'Product Y'],
+    type: [String],
+  })
+  productsNotSold: string[];
+
+  @ApiProperty({
+    example: ['Consulting', 'Implementation', 'Training'],
+    type: [String],
+  })
+  servicesSold: string[];
+
+  @ApiProperty({
     example: {
       description: 'AI-powered agency automation platform',
       technologies: ['React', 'Node.js'],

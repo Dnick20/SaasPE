@@ -26,8 +26,8 @@ export function BuyMailboxDialog({ open, onClose, onPurchased }: BuyMailboxDialo
       await qc.invalidateQueries({ queryKey: ['mailboxes'] });
       onPurchased?.(`${localPart}@${domain}`);
       onClose();
-    } catch (e: any) {
-      setError(e?.message || 'Failed to purchase mailbox');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to purchase mailbox');
     } finally {
       setLoading(false);
     }

@@ -75,7 +75,7 @@ export function BulkCSVUpload({ onComplete }: BulkCSVUploadProps) {
 
         for (let i = 1; i < lines.length; i++) {
           const values = lines[i].split(',').map((v) => v.trim());
-          const account: any = {};
+          const account: Record<string, string> = {};
 
           headers.forEach((header, index) => {
             account[header] = values[index];

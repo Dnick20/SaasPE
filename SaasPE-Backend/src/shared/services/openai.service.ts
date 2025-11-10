@@ -79,6 +79,111 @@ interface ProposalContent {
 }
 
 /**
+ * Canonical proposal section keys - single source of truth
+ * Used across prompts, validation, and database mapping
+ */
+const PROPOSAL_SECTION_KEYS = {
+  OVERVIEW: 'overview',
+  EXECUTIVE_SUMMARY: 'executiveSummary',
+  OBJECTIVES_AND_OUTCOMES: 'objectivesAndOutcomes',
+  SCOPE_OF_WORK: 'scopeOfWork',
+  DELIVERABLES: 'deliverables',
+  APPROACH_AND_TOOLS: 'approachAndTools',
+  TIMELINE: 'timeline',
+  PRICING: 'pricing',
+  PAYMENT_TERMS: 'paymentTerms',
+  CANCELLATION_NOTICE: 'cancellationNotice',
+} as const;
+
+/**
+ * Strict JSON Schema for OpenAI response_format enforcement
+ * Guarantees all 9 required fields are present with correct types
+ */
+const PROPOSAL_GENERATION_SCHEMA = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'proposal_generation',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        [PROPOSAL_SECTION_KEYS.OVERVIEW]: {
+          type: 'string',
+          description: 'Brief overview summary for cover page (2-3 sentences)',
+        },
+        [PROPOSAL_SECTION_KEYS.EXECUTIVE_SUMMARY]: {
+          type: 'string',
+          description: 'High-level proposal summary emphasizing value and ROI',
+        },
+        [PROPOSAL_SECTION_KEYS.OBJECTIVES_AND_OUTCOMES]: {
+          type: 'string',
+          description: 'Clear objectives and expected business outcomes',
+        },
+        [PROPOSAL_SECTION_KEYS.SCOPE_OF_WORK]: {
+          type: 'string',
+          description: 'Detailed work to be performed with specific tasks',
+        },
+        [PROPOSAL_SECTION_KEYS.DELIVERABLES]: {
+          type: 'string',
+          description: 'Specific outputs and tangible artifacts (list format)',
+        },
+        [PROPOSAL_SECTION_KEYS.APPROACH_AND_TOOLS]: {
+          type: 'string',
+          description: 'Methodology, approach, and technologies to be used',
+        },
+        [PROPOSAL_SECTION_KEYS.TIMELINE]: {
+          type: 'string',
+          description: 'Project schedule with phases and milestones',
+        },
+        [PROPOSAL_SECTION_KEYS.PRICING]: {
+          type: 'object',
+          description: 'Pricing breakdown with line items and total',
+          properties: {
+            items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string', description: 'Service or item name' },
+                  description: { type: 'string', description: 'What is included' },
+                  price: { type: 'number', description: 'Price as number (no currency symbols)' },
+                },
+                required: ['name', 'description', 'price'],
+                additionalProperties: false,
+              },
+            },
+            total: { type: 'number', description: 'Total price (sum of all items)' },
+          },
+          required: ['items', 'total'],
+          additionalProperties: false,
+        },
+        [PROPOSAL_SECTION_KEYS.PAYMENT_TERMS]: {
+          type: 'string',
+          description: 'Payment schedule and terms of engagement',
+        },
+        [PROPOSAL_SECTION_KEYS.CANCELLATION_NOTICE]: {
+          type: 'string',
+          description: 'Cancellation policy and notice requirements',
+        },
+      },
+      required: [
+        PROPOSAL_SECTION_KEYS.OVERVIEW,
+        PROPOSAL_SECTION_KEYS.EXECUTIVE_SUMMARY,
+        PROPOSAL_SECTION_KEYS.OBJECTIVES_AND_OUTCOMES,
+        PROPOSAL_SECTION_KEYS.SCOPE_OF_WORK,
+        PROPOSAL_SECTION_KEYS.DELIVERABLES,
+        PROPOSAL_SECTION_KEYS.APPROACH_AND_TOOLS,
+        PROPOSAL_SECTION_KEYS.TIMELINE,
+        PROPOSAL_SECTION_KEYS.PRICING,
+        PROPOSAL_SECTION_KEYS.PAYMENT_TERMS,
+        PROPOSAL_SECTION_KEYS.CANCELLATION_NOTICE,
+      ],
+      additionalProperties: false,
+    },
+  },
+};
+
+/**
  * OpenAI Service
  *
  * Handles all OpenAI API integrations:
@@ -1230,18 +1335,32 @@ Generate a proposal.`;
         messages.push({ role: 'user', content: exampleUserPrompt });
 
         const exampleAssistantResponse = {
+          overview:
+            example.coverPageData?.summary ||
+            'Brief overview of the engagement and value proposition.',
           executiveSummary:
             example.executiveSummary ||
             'Professional executive summary highlighting value proposition.',
-          problemStatement:
-            example.problemStatement ||
-            'Clear articulation of client challenges.',
-          proposedSolution:
-            example.proposedSolution ||
-            'Tailored solution addressing all pain points.',
-          scope: example.scope || 'Detailed scope of work and deliverables.',
+          objectivesAndOutcomes:
+            example.objectivesAndOutcomes ||
+            'Clear objectives and expected business outcomes.',
+          scopeOfWork:
+            example.scopeOfWork ||
+            'Detailed scope of work and deliverables.',
+          deliverables:
+            example.deliverables ||
+            'List of specific deliverables and tangible outputs.',
+          approachAndTools:
+            example.approachAndTools ||
+            'Methodology, approach, and tools to be used.',
           timeline: example.timeline || 'Realistic timeline with milestones.',
           pricing: example.pricing || 'Transparent pricing structure.',
+          paymentTerms:
+            example.paymentTerms ||
+            'Payment schedule and terms of engagement.',
+          cancellationNotice:
+            example.cancellationNotice ||
+            'Cancellation policy and notice requirements.',
         };
 
         messages.push({
@@ -1329,11 +1448,11 @@ Generate a compelling proposal following the format of the winning examples abov
 
       messages.push({ role: 'user', content: currentTaskPrompt });
 
-      // Call GPT-4 with enhanced context
+      // Call GPT-4 with enhanced context and STRICT JSON schema enforcement
       const response = await this.client.chat.completions.create({
         model: 'gpt-4o', // Optimized for complex generation (75% cost savings vs gpt-4-turbo)
         messages,
-        response_format: { type: 'json_object' },
+        response_format: PROPOSAL_GENERATION_SCHEMA as any, // Enforce exact field names and types
         temperature: 0.7,
         max_tokens: maxTokens,
       });
@@ -1361,12 +1480,13 @@ Generate a compelling proposal following the format of the winning examples abov
 
       // Parse JSON with fallback
       const jsonSchema = `{
-  "overview": "string",
-  "executiveSummary": "string",
-  "problemStatement": "string",
-  "proposedSolution": "string",
-  "scope": "string",
-  "timeline": "string",
+  "overview": "string (brief summary for cover page)",
+  "executiveSummary": "string (high-level proposal summary)",
+  "objectivesAndOutcomes": "string (goals and expected results)",
+  "scopeOfWork": "string (detailed work to be performed)",
+  "deliverables": "string (specific outputs and artifacts)",
+  "approachAndTools": "string (methodology and technologies)",
+  "timeline": "string (project schedule and milestones)",
   "pricing": {
     "items": [
       {
@@ -1376,7 +1496,9 @@ Generate a compelling proposal following the format of the winning examples abov
       }
     ],
     "total": "number (sum of all item prices)"
-  }
+  },
+  "paymentTerms": "string (payment schedule and terms)",
+  "cancellationNotice": "string (cancellation policy)"
 }`;
 
       let content: ProposalContent;

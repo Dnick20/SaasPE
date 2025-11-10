@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, FileDown, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api/client';
 
 export default function ProposalPreviewPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -28,6 +29,32 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
     load();
   }, [id]);
 
+  // Poll for status updates when proposal is generating
+  useEffect(() => {
+    if (!proposal || proposal.status !== 'generating') {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const updated = await proposalsApi.getOne(id);
+        setProposal(updated);
+
+        // Stop polling when status changes from generating
+        if (updated.status !== 'generating') {
+          clearInterval(pollInterval);
+          if (updated.status === 'ready') {
+            toast.success('Proposal generation completed!');
+          }
+        }
+      } catch (error) {
+        console.error('Error polling proposal status:', error);
+      }
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [id, proposal?.status]);
+
   if (loading || !proposal) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -38,7 +65,7 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
 
   const exportPdf = async () => {
     try {
-      const url = `/api/v1/proposals/${proposal.id}/pdf`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'https://api.saasope.com'}/api/v1/proposals/${proposal.id}/pdf`;
       const a = document.createElement('a');
       a.href = url;
       a.download = `${proposal.title}.pdf`;
@@ -52,8 +79,11 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
 
   const exportGDoc = async () => {
     try {
-      const statusResp = await fetch('/api/v1/auth/google/status', { credentials: 'include' });
-      const status = statusResp.ok ? await statusResp.json() : { data: { connected: false } };
+      let status: any = { data: { connected: false } };
+      try {
+        const { data } = await apiClient.get('/api/v1/auth/google/status');
+        status = data;
+      } catch {}
       if (!status?.data?.connected) {
         const confirmConnect = window.confirm('Connect Google to export to Google Docs?');
         if (confirmConnect) window.location.href = '/api/v1/auth/google/authorize';
@@ -72,14 +102,28 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
         <h1 className="text-3xl font-bold text-gray-900">Preview Proposal</h1>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => router.push(`/dashboard/proposals/${id}/edit`)}>Edit</Button>
-          <Button variant="outline" onClick={exportPdf} className="gap-2">
+          <Button variant="outline" onClick={exportPdf} className="gap-2" disabled={proposal.status === 'generating'}>
             <FileDown className="h-4 w-4" /> PDF
           </Button>
-          <Button variant="outline" onClick={exportGDoc} className="gap-2">
+          <Button variant="outline" onClick={exportGDoc} className="gap-2" disabled={proposal.status === 'generating'}>
             <ExternalLink className="h-4 w-4" /> Google Docs
           </Button>
         </div>
       </div>
+
+      {proposal.status === 'generating' && (
+        <Card className="bg-blue-50 border-blue-200">
+          <CardContent className="py-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <div>
+                <p className="font-medium text-blue-900">AI is generating your proposal...</p>
+                <p className="text-sm text-blue-700">This usually takes 30-60 seconds. The page will update automatically.</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

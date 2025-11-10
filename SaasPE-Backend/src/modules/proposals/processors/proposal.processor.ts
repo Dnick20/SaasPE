@@ -203,6 +203,15 @@ export class ProposalProcessor implements OnModuleInit {
 
       const aiDuration = Date.now() - aiStartTime;
 
+      // Debug logging: Show exactly which fields the AI returned
+      const returnedFields = Object.keys(generatedContent).filter(k => k !== '_metadata');
+      this.logger.log('AI returned fields', {
+        proposalId,
+        returnedFields,
+        fieldCount: returnedFields.length,
+        event: 'ai_fields_returned',
+      });
+
       // Use actual token counts from API if available, otherwise estimate
       const actualTokens = generatedContent._metadata;
       const promptTokens = actualTokens?.promptTokens || Math.ceil(
@@ -246,21 +255,41 @@ export class ProposalProcessor implements OnModuleInit {
         aiCost,
       };
 
-      // Map generated content to proposal fields
+      // Map generated content to proposal fields with backward compatibility
+      if (generatedContent.overview) {
+        // Map overview to coverPageData.summary (stored as JSON)
+        updateData.coverPageData = {
+          summary: generatedContent.overview,
+        };
+      }
       if (generatedContent.executiveSummary) {
         updateData.executiveSummary = generatedContent.executiveSummary;
       }
-      if (generatedContent.problemStatement) {
-        updateData.problemStatement = generatedContent.problemStatement;
+      if (generatedContent.objectivesAndOutcomes) {
+        updateData.objectivesAndOutcomes = generatedContent.objectivesAndOutcomes;
       }
-      if (generatedContent.proposedSolution) {
-        updateData.proposedSolution = generatedContent.proposedSolution;
+
+      // Backward compatibility: map legacy 'scope' to 'scopeOfWork'
+      if (generatedContent.scopeOfWork) {
+        updateData.scopeOfWork = generatedContent.scopeOfWork;
+      } else if (generatedContent.scope) {
+        this.logger.warn('Legacy field "scope" detected, mapping to "scopeOfWork"', {
+          proposalId,
+          event: 'legacy_field_mapping',
+        });
+        updateData.scopeOfWork = generatedContent.scope;
       }
-      if (generatedContent.scope) {
-        // Convert scope to string if it's an array
-        updateData.scope = Array.isArray(generatedContent.scope)
-          ? generatedContent.scope.join('\n')
-          : generatedContent.scope;
+      if (generatedContent.deliverables) {
+        updateData.deliverables = generatedContent.deliverables;
+      }
+      if (generatedContent.approachAndTools) {
+        updateData.approachAndTools = generatedContent.approachAndTools;
+      }
+      if (generatedContent.paymentTerms) {
+        updateData.paymentTerms = generatedContent.paymentTerms;
+      }
+      if (generatedContent.cancellationNotice) {
+        updateData.cancellationNotice = generatedContent.cancellationNotice;
       }
       if (generatedContent.timeline) {
         // Convert timeline to string if it's an object
@@ -338,6 +367,17 @@ export class ProposalProcessor implements OnModuleInit {
           updateData.pricing = null;
         }
       }
+
+      // Debug logging: Show which fields we're saving to database
+      const savedFields = Object.keys(updateData).filter(k =>
+        !['status', 'aiModel', 'aiPromptTokens', 'aiCompletionTokens', 'aiCost'].includes(k)
+      );
+      this.logger.log('Saving fields to database', {
+        proposalId,
+        savedFields,
+        savedFieldCount: savedFields.length,
+        event: 'fields_saving_to_db',
+      });
 
       const dbStartTime = Date.now();
       await this.prisma.proposal.update({

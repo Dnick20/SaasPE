@@ -59,8 +59,11 @@ export function SingleAccountForm({
       queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
       onComplete();
     },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to connect account');
+    onError: (error: unknown) => {
+      const message = error && typeof error === 'object' && 'response' in error
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to connect account'
+        : 'Failed to connect account';
+      toast.error(message);
     },
   });
 

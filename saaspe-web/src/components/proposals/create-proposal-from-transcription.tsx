@@ -6,9 +6,10 @@ import { Sparkles, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TranscriptionSelector } from './transcription-selector';
+import { apiClient } from '@/lib/api/client';
 
 interface CreateProposalFromTranscriptionProps {
-  clientId: string;
+  clientId?: string;
   initialTranscriptionId?: string;
   onBack: () => void;
 }
@@ -21,6 +22,7 @@ export function CreateProposalFromTranscription({
   onBack,
 }: CreateProposalFromTranscriptionProps) {
   const router = useRouter();
+  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || 'https://api.saasope.com');
   const [selectedTranscriptionId, setSelectedTranscriptionId] = useState<string | null>(initialTranscriptionId || null);
   const [status, setStatus] = useState<GenerationStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -39,15 +41,7 @@ export function CreateProposalFromTranscription({
 
     try {
       while (attempts < maxAttempts) {
-        const response = await fetch(`/api/v1/proposals/${proposalId}`, {
-          credentials: 'include',
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to check proposal status');
-        }
-
-        const proposal = await response.json();
+        const { data: proposal } = await apiClient.get(`${API_BASE}/api/v1/proposals/${proposalId}`);
 
         // Check if proposal is ready
         if (proposal.status === 'ready' || proposal.status === 'draft') {
@@ -85,27 +79,13 @@ export function CreateProposalFromTranscription({
       setError(null);
       setElapsedTime(0);
 
-      const response = await fetch(`/api/v1/proposals/from-transcription`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          clientId,
-          transcriptionId: data.transcriptionId,
-          title: data.title,
-          coverPageData: data.coverPageData,
-          tableOfContents: true,
-        }),
+      const { data: result } = await apiClient.post(`${API_BASE}/api/v1/proposals/from-transcription`, {
+        ...(clientId && { clientId }),
+        transcriptionId: data.transcriptionId,
+        title: data.title,
+        coverPageData: data.coverPageData,
+        tableOfContents: true,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to generate proposal');
-      }
-
-      const result = await response.json();
       setGeneratedProposalId(result.id);
 
       // Poll for proposal completion

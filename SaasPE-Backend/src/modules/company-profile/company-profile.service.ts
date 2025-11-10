@@ -15,6 +15,23 @@ export class CompanyProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
+   * Sanitize string array: trim, dedupe (case-insensitive), filter empties
+   */
+  private sanitizeStringArray(arr?: string[]): string[] {
+    if (!arr || !Array.isArray(arr)) {
+      return [];
+    }
+
+    const trimmed = arr.map((s) => s.trim()).filter((s) => s.length > 0);
+    const unique = trimmed.filter(
+      (item, index, self) =>
+        self.findIndex((t) => t.toLowerCase() === item.toLowerCase()) === index,
+    );
+
+    return unique;
+  }
+
+  /**
    * Transform company profile to response DTO
    */
   private toResponseDto(profile: any): CompanyProfileResponseDto {
@@ -26,6 +43,9 @@ export class CompanyProfileService {
       industry: profile.industry,
       targetICP: profile.targetICP,
       preferredTone: profile.preferredTone,
+      productsSold: profile.productsSold || [],
+      productsNotSold: profile.productsNotSold || [],
+      servicesSold: profile.servicesSold || [],
       enrichmentData: profile.enrichmentData,
       scraped: profile.scraped,
       scrapedAt: profile.scrapedAt,
@@ -61,6 +81,9 @@ export class CompanyProfileService {
         industry: dto.industry,
         targetICP: dto.targetICP,
         preferredTone: dto.preferredTone || 'professional',
+        productsSold: this.sanitizeStringArray(dto.productsSold),
+        productsNotSold: this.sanitizeStringArray(dto.productsNotSold),
+        servicesSold: this.sanitizeStringArray(dto.servicesSold),
         enrichmentData: {},
         defaultSettings: {},
       },
@@ -119,6 +142,15 @@ export class CompanyProfileService {
         ...(dto.industry && { industry: dto.industry }),
         ...(dto.targetICP && { targetICP: dto.targetICP }),
         ...(dto.preferredTone && { preferredTone: dto.preferredTone }),
+        ...(dto.productsSold !== undefined && {
+          productsSold: this.sanitizeStringArray(dto.productsSold),
+        }),
+        ...(dto.productsNotSold !== undefined && {
+          productsNotSold: this.sanitizeStringArray(dto.productsNotSold),
+        }),
+        ...(dto.servicesSold !== undefined && {
+          servicesSold: this.sanitizeStringArray(dto.servicesSold),
+        }),
         ...(dto.enrichmentData && {
           enrichmentData: dto.enrichmentData as any,
         }),

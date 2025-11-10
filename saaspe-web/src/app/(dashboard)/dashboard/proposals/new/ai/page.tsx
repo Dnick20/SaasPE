@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { proposalsApi } from '@/lib/api/endpoints/proposals';
+import { clientsApi } from '@/lib/api/endpoints/clients';
 
 interface Client { id: string; companyName: string; }
 
@@ -33,11 +34,8 @@ function AIProposalNewContent() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const resp = await fetch('/api/v1/clients?limit=100', { credentials: 'include' });
-        if (resp.ok) {
-          const data = await resp.json();
-          setClients(data.data || []);
-        }
+        const list = await clientsApi.getAll(1, 100);
+        setClients(list.data || []);
       } catch (e) {
         console.error(e);
       } finally {

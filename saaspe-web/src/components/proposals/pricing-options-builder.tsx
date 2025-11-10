@@ -46,7 +46,7 @@ export function PricingOptionsBuilder({ options, onChange }: PricingOptionsBuild
     onChange(newOptions);
   };
 
-  const updateOption = (index: number, field: keyof PricingOption, value: any) => {
+  const updateOption = (index: number, field: keyof PricingOption, value: string | number | PricingItem[]) => {
     const newOptions = [...options];
     newOptions[index] = { ...newOptions[index], [field]: value };
     onChange(newOptions);
@@ -71,11 +71,11 @@ export function PricingOptionsBuilder({ options, onChange }: PricingOptionsBuild
     onChange(newOptions);
   };
 
-  const updateItem = (optionIndex: number, itemIndex: number, field: keyof PricingItem, value: any) => {
+  const updateItem = (optionIndex: number, itemIndex: number, field: keyof PricingItem, value: string | number) => {
     const newOptions = [...options];
     newOptions[optionIndex].items[itemIndex] = {
       ...newOptions[optionIndex].items[itemIndex],
-      [field]: field === 'price' ? parseFloat(value) || 0 : value,
+      [field]: field === 'price' ? parseFloat(String(value)) || 0 : value,
     };
 
     // Recalculate total

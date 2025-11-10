@@ -8,14 +8,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Plus, X } from 'lucide-react';
 import { useState } from 'react';
 
+interface ICPData {
+  industry?: string;
+  companySize?: string;
+  roles: string[];
+  painPoints: string[];
+}
+
 interface ICPDefinitionStepProps {
-  data: {
-    industry?: string;
-    companySize?: string;
-    roles: string[];
-    painPoints: string[];
-  };
-  onChange: (data: any) => void;
+  data: ICPData;
+  onChange: (data: ICPData) => void;
 }
 
 export function ICPDefinitionStep({ data, onChange }: ICPDefinitionStepProps) {
