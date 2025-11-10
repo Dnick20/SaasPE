@@ -14,7 +14,7 @@ interface ProposalData {
   coverPageData?: any;
   executiveSummary?: string;
   objectivesAndOutcomes?: string;
-  scopeOfWork?: string;
+  scopeOfWork?: any;
   deliverables?: any;
   approachAndTools?: string;
   timeline?: any;
