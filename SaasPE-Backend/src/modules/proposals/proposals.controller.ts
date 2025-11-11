@@ -216,6 +216,27 @@ export class ProposalsController {
   }
 
   /**
+   * Get proposal generation status
+   */
+  @Get(':id/generation-status')
+  @ApiOperation({ summary: 'Check proposal generation status' })
+  @ApiResponse({
+    status: 200,
+    description: 'Generation status retrieved successfully',
+  })
+  @ApiResponse({ status: 404, description: 'Proposal not found' })
+  async getGenerationStatus(
+    @CurrentUser() user: any,
+    @Param('id') id: string,
+  ): Promise<{
+    status: 'draft' | 'generating' | 'ready' | 'failed';
+    progress?: number;
+    error?: string;
+  }> {
+    return this.proposalsService.getGenerationStatus(user.tenantId, id);
+  }
+
+  /**
    * Update proposal content
    */
   @Patch(':id')

@@ -344,6 +344,43 @@ export class ProposalsService {
   }
 
   /**
+   * Get proposal generation status
+   */
+  async getGenerationStatus(
+    tenantId: string,
+    id: string,
+  ): Promise<{
+    status: 'draft' | 'generating' | 'ready' | 'failed';
+    progress?: number;
+    error?: string;
+  }> {
+    const proposal = await this.prisma.proposal.findFirst({
+      where: { id, tenantId },
+      select: { id: true, status: true },
+    });
+
+    if (!proposal) {
+      throw new NotFoundException(`Proposal ${id} not found`);
+    }
+
+    const statusMapping: Record<string, 'draft' | 'generating' | 'ready' | 'failed'> = {
+      draft: 'draft',
+      generating: 'generating',
+      ready: 'ready',
+      failed: 'failed',
+      sent: 'ready',
+      signed: 'ready',
+    };
+
+    const status = statusMapping[proposal.status] || 'draft';
+
+    return {
+      status,
+      progress: status === 'ready' ? 100 : status === 'generating' ? 50 : status === 'failed' ? 0 : 25,
+    };
+  }
+
+  /**
    * Update proposal content
    */
   async update(

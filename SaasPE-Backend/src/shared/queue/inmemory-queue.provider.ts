@@ -12,6 +12,8 @@ export class InMemoryQueueProvider implements QueueProvider {
   private queues: Map<string, QueueJob[]> = new Map();
   private processing = false;
   private maxConcurrency = 3;
+  private pollIntervalMs = 1000; // Poll every second
+  private activeProcessors: Map<string, boolean> = new Map();
 
   constructor(concurrency?: number) {
     if (concurrency) {
@@ -43,40 +45,51 @@ export class InMemoryQueueProvider implements QueueProvider {
     processor: (job: QueueJob<T>) => Promise<QueueJobResult>,
     options?: ProcessOptions,
   ): Promise<void> {
-    if (this.processing) {
+    if (this.activeProcessors.get(jobName)) {
       this.logger.warn(`Queue '${jobName}' already being processed`);
       return;
     }
 
-    this.processing = true;
+    this.activeProcessors.set(jobName, true);
     const concurrency = options?.concurrency || this.maxConcurrency;
     const maxRetries = options?.maxRetries || 3;
 
-    this.logger.log(`Starting to process queue '${jobName}' with concurrency ${concurrency}`);
+    this.logger.log(`Starting continuous processing for queue '${jobName}' with concurrency ${concurrency}`);
 
-    // Simple polling loop (in real implementation, this would be event-driven)
-    const processJobs = async () => {
-      const queue = this.queues.get(jobName) || [];
-      const activeJobs: Promise<void>[] = [];
+    // Continuous polling loop - keeps running until stopped
+    while (this.activeProcessors.get(jobName)) {
+      try {
+        const queue = this.queues.get(jobName) || [];
 
-      while (queue.length > 0 && activeJobs.length < concurrency) {
-        const job = queue.shift();
-        if (!job) continue;
+        if (queue.length > 0) {
+          this.logger.log(`Processing ${queue.length} jobs from queue '${jobName}'`);
 
-        const jobPromise = this.processJob(job as QueueJob<T>, processor, maxRetries, jobName);
-        activeJobs.push(jobPromise);
+          const activeJobs: Promise<void>[] = [];
+
+          // Process up to concurrency limit
+          while (queue.length > 0 && activeJobs.length < concurrency) {
+            const job = queue.shift();
+            if (!job) continue;
+
+            const jobPromise = this.processJob(job as QueueJob<T>, processor, maxRetries, jobName);
+            activeJobs.push(jobPromise);
+          }
+
+          if (activeJobs.length > 0) {
+            await Promise.all(activeJobs);
+          }
+        }
+
+        // Wait before next poll
+        await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));
+      } catch (error) {
+        this.logger.error(`Error in queue processing loop for '${jobName}': ${error.message}`, error.stack);
+        // Continue processing despite errors
+        await new Promise(resolve => setTimeout(resolve, this.pollIntervalMs));
       }
+    }
 
-      if (activeJobs.length > 0) {
-        await Promise.all(activeJobs);
-      }
-    };
-
-    // Process existing jobs
-    await processJobs();
-
-    this.processing = false;
-    this.logger.log(`Finished processing queue '${jobName}'`);
+    this.logger.log(`Stopped processing queue '${jobName}'`);
   }
 
   private async processJob<T>(
@@ -124,9 +137,26 @@ export class InMemoryQueueProvider implements QueueProvider {
     return null;
   }
 
+  async stopProcessing(jobName?: string): Promise<void> {
+    if (jobName) {
+      this.logger.log(`Stopping processing for queue '${jobName}'`);
+      this.activeProcessors.set(jobName, false);
+    } else {
+      this.logger.log('Stopping all queue processing');
+      for (const [name] of this.activeProcessors) {
+        this.activeProcessors.set(name, false);
+      }
+    }
+
+    // Wait a moment for processors to finish current jobs
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+
   async close(): Promise<void> {
     this.logger.log('Closing In-Memory Queue');
+    await this.stopProcessing();
     this.queues.clear();
+    this.activeProcessors.clear();
   }
 
   // Helper method to get queue stats
