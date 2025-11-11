@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, FileDown, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiClient } from '@/lib/api/client';
+import { TimelineDisplay } from '@/components/proposals/TimelineDisplay';
 
 export default function ProposalPreviewPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -181,8 +182,8 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
           )}
           {proposal.timeline && (
             <div>
-              <h3 className="font-semibold mb-1">Timeline</h3>
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap">{typeof proposal.timeline === 'string' ? proposal.timeline : JSON.stringify(proposal.timeline, null, 2)}</pre>
+              <h3 className="font-semibold mb-3">Project Timeline</h3>
+              <TimelineDisplay timeline={proposal.timeline} />
             </div>
           )}
           {proposal.pricing && (
