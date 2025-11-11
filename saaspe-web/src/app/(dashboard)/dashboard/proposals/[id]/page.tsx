@@ -258,9 +258,43 @@ export default function ProposalDetailPage({ params }: ProposalDetailPageProps) 
           </CardHeader>
           <CardContent>
             <div className="prose max-w-none">
-              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                {proposal.scopeOfWork}
-              </p>
+              {typeof proposal.scopeOfWork === 'string' ? (
+                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  {proposal.scopeOfWork}
+                </p>
+              ) : Array.isArray(proposal.scopeOfWork) ? (
+                <div className="space-y-4">
+                  {(proposal.scopeOfWork as Array<{ title?: string; objective?: string; keyActivities?: string[]; outcome?: string }>).map((item, index: number) => (
+                    <div key={index} className="border-l-4 border-green-500 pl-4 py-2">
+                      {item.title && (
+                        <h4 className="font-semibold text-gray-900 mb-2">{item.title}</h4>
+                      )}
+                      {item.objective && (
+                        <div className="mb-2">
+                          <p className="text-sm font-medium text-gray-600">Objective:</p>
+                          <p className="text-gray-700">{item.objective}</p>
+                        </div>
+                      )}
+                      {item.keyActivities && item.keyActivities.length > 0 && (
+                        <div className="mb-2">
+                          <p className="text-sm font-medium text-gray-600">Key Activities:</p>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            {item.keyActivities.map((activity, actIdx) => (
+                              <li key={actIdx} className="text-gray-700">{activity}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {item.outcome && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Outcome:</p>
+                          <p className="text-gray-700">{item.outcome}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </CardContent>
         </Card>

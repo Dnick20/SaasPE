@@ -153,13 +153,57 @@ export default function ProposalPreviewPage({ params }: { params: { id: string }
           {proposal.scopeOfWork && (
             <div>
               <h3 className="font-semibold mb-1">Scope of Work</h3>
-              <p className="text-gray-800 whitespace-pre-wrap">{proposal.scopeOfWork}</p>
+              {typeof proposal.scopeOfWork === 'string' ? (
+                <p className="text-gray-800 whitespace-pre-wrap">{proposal.scopeOfWork}</p>
+              ) : Array.isArray(proposal.scopeOfWork) ? (
+                <div className="space-y-3">
+                  {(proposal.scopeOfWork as Array<{ title?: string; objective?: string; keyActivities?: string[]; outcome?: string }>).map((item, index: number) => (
+                    <div key={index} className="border-l-4 border-green-500 pl-3 py-2">
+                      {item.title && (
+                        <h4 className="font-semibold text-gray-900 mb-1">{item.title}</h4>
+                      )}
+                      {item.objective && (
+                        <div className="mb-1">
+                          <p className="text-sm font-medium text-gray-600">Objective:</p>
+                          <p className="text-gray-800">{item.objective}</p>
+                        </div>
+                      )}
+                      {item.keyActivities && item.keyActivities.length > 0 && (
+                        <div className="mb-1">
+                          <p className="text-sm font-medium text-gray-600">Key Activities:</p>
+                          <ul className="list-disc list-inside space-y-1 ml-2">
+                            {item.keyActivities.map((activity, actIdx) => (
+                              <li key={actIdx} className="text-gray-800">{activity}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {item.outcome && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-600">Outcome:</p>
+                          <p className="text-gray-800">{item.outcome}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : null}
             </div>
           )}
           {proposal.deliverables && (
             <div>
               <h3 className="font-semibold mb-1">Deliverables</h3>
-              <p className="text-gray-800 whitespace-pre-wrap">{proposal.deliverables}</p>
+              {typeof proposal.deliverables === 'string' ? (
+                <p className="text-gray-800 whitespace-pre-wrap">{proposal.deliverables}</p>
+              ) : Array.isArray(proposal.deliverables) ? (
+                <ul className="list-disc list-inside space-y-1">
+                  {(proposal.deliverables as Array<string | { description?: string; name?: string }>).map((item, index: number) => (
+                    <li key={index} className="text-gray-800">
+                      {typeof item === 'string' ? item : item.description || item.name || ''}
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
             </div>
           )}
           {proposal.approachAndTools && (
