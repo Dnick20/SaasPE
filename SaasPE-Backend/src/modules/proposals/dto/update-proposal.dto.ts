@@ -28,6 +28,14 @@ export class UpdateProposalDto {
   executiveSummary?: string;
 
   @ApiProperty({
+    description: 'Objectives and outcomes',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  objectivesAndOutcomes?: string;
+
+  @ApiProperty({
     description: 'Problem statement',
     required: false,
   })
@@ -44,7 +52,7 @@ export class UpdateProposalDto {
   proposedSolution?: string;
 
   @ApiProperty({
-    description: 'Project scope',
+    description: 'Project scope - LEGACY (use scopeOfWork instead)',
     required: false,
   })
   @IsOptional()
@@ -52,11 +60,70 @@ export class UpdateProposalDto {
   scope?: string;
 
   @ApiProperty({
+    description: 'Scope of work - array of work items with title, objective, keyActivities, outcome',
+    required: false,
+  })
+  @IsOptional()
+  scopeOfWork?: any;
+
+  @ApiProperty({
+    description: 'Deliverables - array or string',
+    required: false,
+  })
+  @IsOptional()
+  deliverables?: any;
+
+  @ApiProperty({
+    description: 'Approach and tools',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  approachAndTools?: string;
+
+  @ApiProperty({
     description: 'Timeline (string or structured phases array)',
     required: false,
   })
   @IsOptional()
   timeline?: any;
+
+  @ApiProperty({
+    description: 'Payment terms',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  paymentTerms?: string;
+
+  @ApiProperty({
+    description: 'Cancellation notice',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  cancellationNotice?: string;
+
+  @ApiProperty({
+    description: 'Key priorities - array of 3-6 priority bullets',
+    required: false,
+  })
+  @IsOptional()
+  keyPriorities?: any;
+
+  @ApiProperty({
+    description: 'Next steps - array of 3-5 action items',
+    required: false,
+  })
+  @IsOptional()
+  nextSteps?: any;
+
+  @ApiProperty({
+    description: 'Proposed project phases - array of 2-3 detailed phases with estimatedHours',
+    required: false,
+  })
+  @IsOptional()
+  proposedProjectPhases?: any;
 
   @ApiProperty({
     description: 'Cover page data including metadata',
