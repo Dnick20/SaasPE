@@ -54,14 +54,22 @@ async function bootstrap() {
 
   // CORS configuration
   app.enableCors({
-    origin: [
-      'http://localhost:3001',
-      'http://localhost:3002',
-      'http://localhost:3003',
-      process.env.FRONTEND_URL,
-      'https://app.saasope.com',
-      'https://saaspe-b088p6ag2-dominic-lewis-projects-bb97ca42.vercel.app',
-    ].filter(Boolean),
+    origin: (origin, callback) => {
+      const allowedOrigins = [
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'http://localhost:3003',
+        process.env.FRONTEND_URL,
+        'https://app.saasope.com',
+      ].filter(Boolean);
+
+      // Allow all Vercel preview deployments
+      if (!origin || allowedOrigins.includes(origin) || origin.includes('vercel.app')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 
