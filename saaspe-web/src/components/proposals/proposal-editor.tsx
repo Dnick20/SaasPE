@@ -130,6 +130,34 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
     }
   }, [proposal.pricing, pricingOptions.length]);
 
+  // Helper function to convert JSON array to readable string
+  const convertToEditableString = (value: unknown): string => {
+    if (typeof value === 'string') {
+      return value;
+    }
+    if (Array.isArray(value)) {
+      // Convert array of objects to formatted text
+      return value.map((item, index) => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          const lines: string[] = [];
+          if (item.title) lines.push(`${item.title}`);
+          if (item.objective) lines.push(`Objective: ${item.objective}`);
+          if (item.keyActivities && Array.isArray(item.keyActivities)) {
+            lines.push('Key Activities:');
+            item.keyActivities.forEach((activity: string) => lines.push(`  - ${activity}`));
+          }
+          if (item.outcome) lines.push(`Outcome: ${item.outcome}`);
+          if (item.description) lines.push(item.description);
+          if (item.name) lines.push(item.name);
+          return lines.join('\n');
+        }
+        return String(item);
+      }).join('\n\n');
+    }
+    return '';
+  };
+
   const {
     register,
     handleSubmit,
@@ -142,8 +170,8 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       title: (proposal.title as string) || '',
       executiveSummary: (proposal.executiveSummary as string) || '',
       objectivesAndOutcomes: (proposal.objectivesAndOutcomes as string) || '',
-      scopeOfWork: (proposal.scopeOfWork as string) || '',
-      deliverables: (proposal.deliverables as string) || '',
+      scopeOfWork: convertToEditableString(proposal.scopeOfWork),
+      deliverables: convertToEditableString(proposal.deliverables),
       approachAndTools: (proposal.approachAndTools as string) || '',
       paymentTerms: (proposal.paymentTerms as string) || '',
       cancellationNotice: (proposal.cancellationNotice as string) || '',
@@ -811,7 +839,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Write a compelling executive summary that captures the essence of your proposal..."
-                  onBlur={() => saveSectionsPartial({ executiveSummary: (document.getElementById('executiveSummary') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: 2-3 paragraphs
@@ -850,7 +877,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Describe the objectives and expected outcomes for this project..."
-                  onBlur={() => saveSectionsPartial({ objectivesAndOutcomes: (document.getElementById('objectivesAndOutcomes') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Clear, measurable goals and expected outcomes
@@ -889,7 +915,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Describe the scope of work, what's included and excluded from this project..."
-                  onBlur={() => saveSectionsPartial({ scopeOfWork: (document.getElementById('scopeOfWork') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Clear boundaries of what will and won't be done
@@ -905,7 +930,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   value={timelinePhases}
                   onChange={(phases) => {
                     setValue('timeline', phases);
-                    saveSectionsPartial({ timeline: phases as any });
                   }}
                 />
               </div>
@@ -942,7 +966,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="List all deliverables, documents, and outputs that will be provided..."
-                  onBlur={() => saveSectionsPartial({ deliverables: (document.getElementById('deliverables') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Clear list of tangible outputs with specifications
@@ -981,7 +1004,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Explain the approach, methodology, and tools that will be used in this project..."
-                  onBlur={() => saveSectionsPartial({ approachAndTools: (document.getElementById('approachAndTools') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Specific methodologies and technology stack
@@ -1020,7 +1042,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Describe payment terms, schedule, methods, and any applicable late fees..."
-                  onBlur={() => saveSectionsPartial({ paymentTerms: (document.getElementById('paymentTerms') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Clear payment schedule and accepted payment methods
@@ -1059,7 +1080,6 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                   rows={12}
                   className="resize-y"
                   placeholder="Describe cancellation policy, notice period, and any applicable fees..."
-                  onBlur={() => saveSectionsPartial({ cancellationNotice: (document.getElementById('cancellationNotice') as HTMLTextAreaElement)?.value })}
                 />
                 <p className="text-xs text-gray-400 mt-1">
                   Recommended: Clear notice period and cancellation terms
