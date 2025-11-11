@@ -332,6 +332,20 @@ class ErrorReportingService {
   }
 
   /**
+   * Map Sentry severity to backend severity enum
+   */
+  private mapSeverityToBackend(severity: ErrorSeverity): string {
+    const mapping: Record<ErrorSeverity, string> = {
+      fatal: 'CRITICAL',
+      error: 'HIGH',
+      warning: 'MEDIUM',
+      info: 'INFO',
+      debug: 'LOW',
+    };
+    return mapping[severity] || 'MEDIUM';
+  }
+
+  /**
    * Send error to backend API
    */
   private async sendErrorToBackend(
@@ -351,7 +365,7 @@ class ErrorReportingService {
       await apiClient.post('/api/v1/admin/errors', {
         errorId: `web-${Date.now()}-${Math.random().toString(36).substring(7)}`,
         sentryId,
-        severity: context.severity.toUpperCase(),
+        severity: this.mapSeverityToBackend(context.severity),
         category: context.category,
         source: 'frontend',
         message: error.message,
