@@ -185,6 +185,19 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
   const timelineValue = watch('timeline');
   const timelinePhases: TimelinePhase[] = Array.isArray(timelineValue) ? timelineValue as TimelinePhase[] : [];
 
+  // Warn user about unsaved changes when leaving page
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
+
   const saveSectionsPartial = useCallback(
     (fields?: Partial<ProposalFormData>) => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
@@ -494,7 +507,22 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+    <form onSubmit={handleSubmit(onSave)} className="space-y-6 relative">
+      {/* Loading Overlay */}
+      {saving && (
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center">
+          <Card className="p-6">
+            <div className="flex items-center gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              <div>
+                <p className="font-medium text-gray-900">Saving your proposal...</p>
+                <p className="text-sm text-gray-600">Please wait a moment</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
+
       {/* Header Actions */}
       <Card>
         <CardContent className="py-4">

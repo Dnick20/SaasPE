@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,11 @@ interface TimelineBuilderProps {
 
 export function TimelineBuilder({ value, onChange }: TimelineBuilderProps) {
   const [phases, setPhases] = useState<TimelinePhase[]>(value || []);
+
+  // Sync state when value prop changes (e.g., from AI regeneration)
+  useEffect(() => {
+    setPhases(value || []);
+  }, [value]);
 
   const update = (next: TimelinePhase[]) => {
     setPhases(next);
