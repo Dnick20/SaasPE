@@ -1,8 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { DatabaseModule } from '../../shared/database/database.module';
-import { S3Service } from '../../shared/services/s3.service';
-import { OpenAIService } from '../../shared/services/openai.service';
+import { ServicesModule } from '../../shared/services/services.module';
 import { TranscriptionsController } from './transcriptions.controller';
 import { TranscriptionsService } from './transcriptions.service';
 import { TranscriptionProcessor } from './processors/transcription.processor';
@@ -20,13 +19,13 @@ import { ContactsModule } from '../contacts/contacts.module';
  *
  * Dependencies:
  * - Database (Prisma)
- * - S3 Service (AWS SDK)
- * - OpenAI Service (Whisper + GPT-4)
+ * - S3 Service, OpenAI Service (via ServicesModule)
  * - Bull Queue (Redis-backed job queue)
  */
 @Module({
   imports: [
     DatabaseModule,
+    ServicesModule,
     TokensModule,
     ContactsModule,
     BullModule.registerQueue({
@@ -40,8 +39,6 @@ import { ContactsModule } from '../contacts/contacts.module';
   providers: [
     TranscriptionsService,
     TranscriptionProcessor,
-    S3Service,
-    OpenAIService,
   ],
   exports: [TranscriptionsService],
 })
