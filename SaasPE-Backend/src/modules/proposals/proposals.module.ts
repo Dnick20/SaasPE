@@ -1,20 +1,11 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { DatabaseModule } from '../../shared/database/database.module';
+import { ServicesModule } from '../../shared/services/services.module';
 import { TokensModule } from '../tokens/tokens.module';
 import { AuthModule } from '../auth/auth.module';
 import { ClientsModule } from '../clients/clients.module';
 import { TranscriptionsModule } from '../transcriptions/transcriptions.module';
-import { S3Service } from '../../shared/services/s3.service';
-import { OpenAIService } from '../../shared/services/openai.service';
-import { PdfService } from '../../shared/services/pdf.service';
-import { DocuSignService } from '../../shared/services/docusign.service';
-import { AdobeSignService } from '../../shared/services/adobe-sign.service';
-import { SignNowService } from '../../shared/services/signnow.service';
-import { GoogleWorkspaceSignatureService } from '../../shared/services/google-workspace-signature.service';
-import { GoogleOAuthService } from '../../shared/services/google/google-oauth.service';
-import { GDocsExporterService } from '../../shared/services/google/gdocs-exporter.service';
-import { WordExporterService } from '../../shared/services/word-exporter.service';
 import { ESignatureProviderFactory } from '../../shared/services/e-signature-provider.factory';
 import { ESignatureConnectionsService } from '../e-signature-connections/e-signature-connections.service';
 import { ProposalsController } from './proposals.controller';
@@ -26,15 +17,6 @@ import { ProposalContextBuilderService } from './services/proposal-context-build
 import { PricingTemplateService } from './services/pricing-template.service';
 import { ProposalAutofillService } from './services/proposal-autofill.service';
 import { QueueWorkerService } from './services/queue-worker.service';
-
-// Phase 1: Personalized Learning Services
-import { EditTrackingService } from '../../shared/services/edit-tracking.service';
-import { FeedbackValidationService } from '../../shared/services/feedback-validation.service';
-import { PatternExtractionService } from '../../shared/services/pattern-extraction.service';
-
-// Phase 2: Multi-Pass Extraction Services
-import { ConfidenceScoringService } from '../../shared/services/confidence-scoring.service';
-import { MultiPassExtractionService } from '../../shared/services/multi-pass-extraction.service';
 
 // Queue Abstraction
 import { QueueProvider } from '../../shared/queue/queue.types';
@@ -64,6 +46,7 @@ import { InMemoryQueueProvider } from '../../shared/queue/inmemory-queue.provide
 @Module({
   imports: [
     DatabaseModule,
+    ServicesModule,
     TokensModule,
     AuthModule,
     ClientsModule,
@@ -111,25 +94,8 @@ import { InMemoryQueueProvider } from '../../shared/queue/inmemory-queue.provide
     ProposalContextBuilderService,
     ProposalAutofillService,
     PricingTemplateService,
-    S3Service,
-    OpenAIService,
-    PdfService,
-    DocuSignService,
-    AdobeSignService,
-    SignNowService,
-    GoogleWorkspaceSignatureService,
-    GoogleOAuthService,
-    GDocsExporterService,
-    WordExporterService,
     ESignatureProviderFactory,
     ESignatureConnectionsService,
-    // Phase 1: Personalized Learning
-    EditTrackingService,
-    FeedbackValidationService,
-    PatternExtractionService,
-    // Phase 2: Multi-Pass Extraction
-    ConfidenceScoringService,
-    MultiPassExtractionService,
   ],
   exports: [ProposalsService],
 })
