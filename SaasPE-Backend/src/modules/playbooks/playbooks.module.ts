@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../shared/database/database.module';
-import { OpenAIService } from '../../shared/services/openai.service';
+import { ServicesModule } from '../../shared/services/services.module';
 import { PlaybooksController } from './playbooks.controller';
 import { PlaybooksService } from './playbooks.service';
 
@@ -16,12 +16,12 @@ import { PlaybooksService } from './playbooks.service';
  *
  * Dependencies:
  * - Database (Prisma)
- * - OpenAI Service for script generation
+ * - OpenAI Service for script generation (via ServicesModule)
  */
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, ServicesModule],
   controllers: [PlaybooksController],
-  providers: [PlaybooksService, OpenAIService],
+  providers: [PlaybooksService],
   exports: [PlaybooksService],
 })
 export class PlaybooksModule {}
