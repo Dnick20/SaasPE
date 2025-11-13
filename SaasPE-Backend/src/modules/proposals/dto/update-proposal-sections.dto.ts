@@ -26,11 +26,15 @@ export class UpdateProposalSectionsDto {
   @IsString()
   objectivesAndOutcomes?: string;
 
-  @ApiPropertyOptional({ description: 'Scope of work - array of work items with title, objective, keyActivities, outcome' })
+  @ApiPropertyOptional({
+    description: 'Scope of work - accepts structured array or legacy string. Structured format: Array<{ title: string; objective?: string; keyActivities?: string[]; outcome?: string }>'
+  })
   @IsOptional()
   scopeOfWork?: any;
 
-  @ApiPropertyOptional({ description: 'Deliverables - array or string' })
+  @ApiPropertyOptional({
+    description: 'Deliverables - accepts structured array or legacy string. Structured format: Array<{ name: string; description?: string }>'
+  })
   @IsOptional()
   deliverables?: any;
 
@@ -39,7 +43,9 @@ export class UpdateProposalSectionsDto {
   @IsString()
   approachAndTools?: string;
 
-  @ApiPropertyOptional({ description: 'Project timeline (string or structured JSON)' })
+  @ApiPropertyOptional({
+    description: 'Project timeline - accepts structured array or legacy string. Structured format: Array<{ phase: string; commitment: string; window?: string; focus: string; bullets: string[]; estimatedHours: { perMonth: number; perWeek: number } }>'
+  })
   @IsOptional()
   timeline?: any;
 

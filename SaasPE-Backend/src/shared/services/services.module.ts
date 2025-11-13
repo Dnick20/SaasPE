@@ -11,6 +11,7 @@ import { SesManagementService } from './ses-management.service';
 import { WordExporterService } from './word-exporter.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
 import { MultiPassExtractionService } from './multi-pass-extraction.service';
+import { DeepThinkingAgentService } from './deep-thinking-agent.service';
 
 /**
  * Shared Services Module
@@ -45,6 +46,7 @@ import { MultiPassExtractionService } from './multi-pass-extraction.service';
     WordExporterService,
     ConfidenceScoringService,
     MultiPassExtractionService,
+    DeepThinkingAgentService,
   ],
   exports: [
     EncryptionService,
@@ -58,6 +60,7 @@ import { MultiPassExtractionService } from './multi-pass-extraction.service';
     WordExporterService,
     ConfidenceScoringService,
     MultiPassExtractionService,
+    DeepThinkingAgentService,
   ],
 })
 export class ServicesModule {}

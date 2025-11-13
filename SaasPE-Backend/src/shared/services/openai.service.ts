@@ -10,6 +10,7 @@ import {
   extractorSystemPrompt,
   extractorUserTemplate,
 } from '../prompts/leadIntake.prompts';
+import { DeepThinkingAgentService } from './deep-thinking-agent.service';
 
 interface TranscriptionResult {
   text: string;
@@ -393,6 +394,7 @@ export class OpenAIService {
   constructor(
     private config: ConfigService,
     private prisma: PrismaService,
+    private deepThinkingAgent: DeepThinkingAgentService,
   ) {
     const apiKey = this.config.get('OPENAI_API_KEY');
 
@@ -1408,8 +1410,178 @@ Be concise but comprehensive.`,
   }
 
   /**
+   * Validate generated proposal content for completeness and correctness
+   * Returns array of validation errors (empty if valid)
+   */
+  private validateProposalContent(content: any): Array<{
+    field: string;
+    issue: string;
+    expectedFormat?: string;
+    receivedValue?: any;
+  }> {
+    const errors: Array<{
+      field: string;
+      issue: string;
+      expectedFormat?: string;
+      receivedValue?: any;
+    }> = [];
+
+    // Check required fields
+    const requiredFields = [
+      'coverPageData',
+      'tableOfContents',
+      'overview',
+      'executiveSummary',
+      'keyPriorities',
+      'objectivesAndOutcomes',
+      'scopeOfWork',
+      'deliverables',
+      'approachAndTools',
+      'timeline',
+      'proposedProjectPhases',
+      'pricing',
+      'paymentTerms',
+      'nextSteps',
+      'cancellationNotice',
+    ];
+
+    for (const field of requiredFields) {
+      if (!content[field]) {
+        errors.push({
+          field,
+          issue: 'Missing required field',
+          receivedValue: content[field],
+        });
+      }
+    }
+
+    // Validate proposedProjectPhases structure
+    if (content.proposedProjectPhases) {
+      if (!Array.isArray(content.proposedProjectPhases)) {
+        errors.push({
+          field: 'proposedProjectPhases',
+          issue: 'Must be an array',
+          expectedFormat: 'Array<ProposedProjectPhase>',
+          receivedValue: typeof content.proposedProjectPhases,
+        });
+      } else if (content.proposedProjectPhases.length < 2 || content.proposedProjectPhases.length > 3) {
+        errors.push({
+          field: 'proposedProjectPhases',
+          issue: 'Must have 2-3 phases',
+          expectedFormat: 'Array with 2-3 items',
+          receivedValue: `${content.proposedProjectPhases.length} items`,
+        });
+      } else {
+        // Validate each phase
+        content.proposedProjectPhases.forEach((phase: any, index: number) => {
+          if (!phase.phase) {
+            errors.push({
+              field: `proposedProjectPhases[${index}].phase`,
+              issue: 'Missing phase name',
+              receivedValue: phase.phase,
+            });
+          }
+          if (!phase.estimatedHours || typeof phase.estimatedHours !== 'object') {
+            errors.push({
+              field: `proposedProjectPhases[${index}].estimatedHours`,
+              issue: 'Missing or invalid estimatedHours',
+              expectedFormat: '{ perMonth: number, perWeek: number }',
+              receivedValue: phase.estimatedHours,
+            });
+          } else {
+            if (typeof phase.estimatedHours.perMonth !== 'number') {
+              errors.push({
+                field: `proposedProjectPhases[${index}].estimatedHours.perMonth`,
+                issue: 'Must be a number',
+                receivedValue: phase.estimatedHours.perMonth,
+              });
+            }
+            if (typeof phase.estimatedHours.perWeek !== 'number') {
+              errors.push({
+                field: `proposedProjectPhases[${index}].estimatedHours.perWeek`,
+                issue: 'Must be a number',
+                receivedValue: phase.estimatedHours.perWeek,
+              });
+            }
+          }
+          if (!Array.isArray(phase.bullets) || phase.bullets.length < 2 || phase.bullets.length > 4) {
+            errors.push({
+              field: `proposedProjectPhases[${index}].bullets`,
+              issue: 'Must have 2-4 bullet points',
+              expectedFormat: 'Array of 2-4 strings',
+              receivedValue: Array.isArray(phase.bullets) ? `${phase.bullets.length} items` : typeof phase.bullets,
+            });
+          }
+        });
+      }
+    }
+
+    // Validate scopeOfWork structure
+    if (content.scopeOfWork) {
+      if (!Array.isArray(content.scopeOfWork)) {
+        errors.push({
+          field: 'scopeOfWork',
+          issue: 'Must be an array',
+          expectedFormat: 'Array<ScopeOfWorkItem>',
+          receivedValue: typeof content.scopeOfWork,
+        });
+      } else if (content.scopeOfWork.length < 4 || content.scopeOfWork.length > 6) {
+        errors.push({
+          field: 'scopeOfWork',
+          issue: 'Must have 4-6 work items',
+          expectedFormat: 'Array with 4-6 items',
+          receivedValue: `${content.scopeOfWork.length} items`,
+        });
+      } else {
+        content.scopeOfWork.forEach((item: any, index: number) => {
+          if (!item.title) {
+            errors.push({
+              field: `scopeOfWork[${index}].title`,
+              issue: 'Missing title',
+              receivedValue: item.title,
+            });
+          }
+          if (!item.keyActivities || !Array.isArray(item.keyActivities) || item.keyActivities.length < 3) {
+            errors.push({
+              field: `scopeOfWork[${index}].keyActivities`,
+              issue: 'Must have at least 3 key activities',
+              expectedFormat: 'Array with ≥3 items',
+              receivedValue: Array.isArray(item.keyActivities) ? `${item.keyActivities.length} items` : typeof item.keyActivities,
+            });
+          }
+        });
+      }
+    }
+
+    // Validate timeline structure
+    if (content.timeline) {
+      if (typeof content.timeline === 'object' && !Array.isArray(content.timeline)) {
+        if (!content.timeline.workItems || !Array.isArray(content.timeline.workItems)) {
+          errors.push({
+            field: 'timeline.workItems',
+            issue: 'Missing or invalid workItems array',
+            expectedFormat: 'Array of work items',
+            receivedValue: typeof content.timeline.workItems,
+          });
+        }
+        if (!content.timeline.phases || !Array.isArray(content.timeline.phases)) {
+          errors.push({
+            field: 'timeline.phases',
+            issue: 'Missing or invalid phases array',
+            expectedFormat: 'Array of phases',
+            receivedValue: typeof content.timeline.phases,
+          });
+        }
+      }
+    }
+
+    return errors;
+  }
+
+  /**
    * Enhanced proposal generation with adaptive learning
    * Uses feedback and error patterns to improve output quality
+   * Supports multi-pass generation with DeepThinkingAgent analysis
    */
   async generateProposalContentWithLearning(
     tenantId: string,
@@ -1419,7 +1591,12 @@ Be concise but comprehensive.`,
     wonProposalExamples?: any[],
     discoveryContext?: DiscoveryContext,
     maxTokens: number = 4000,
+    proposalId?: string, // Optional - for DeepThinkingAgent analysis
+    attemptNumber: number = 1, // Track generation attempts
+    previousErrors?: Array<{ field: string; issue: string; expectedFormat?: string; receivedValue?: any }>,
+    lastGeneratedContent?: any,
   ): Promise<ProposalContent> {
+    const MAX_ATTEMPTS = 3;
     try {
       // Use ContextPack if enabled (recommended for token reduction)
       const useContextPack = process.env.ENABLE_CONTEXT_PACK !== 'false'; // Enabled by default
@@ -1448,6 +1625,57 @@ Be concise but comprehensive.`,
       this.logger.log(
         `Using adaptive learning: ${insights.positiveFeedback.length} positive examples, ${insights.improvementSuggestions.length} improvement tips`,
       );
+
+      // DeepThinkingAgent analysis for multi-pass refinement (activates on 2nd+ attempt)
+      let deepThinkingInstructions = '';
+      if (attemptNumber >= 2 && proposalId && previousErrors && previousErrors.length > 0) {
+        this.logger.log(
+          `[DeepThinkingAgent] Analyzing failure for attempt ${attemptNumber}`,
+          {
+            proposalId,
+            errorCount: previousErrors.length,
+            event: 'deep_thinking_analysis_started',
+          },
+        );
+
+        try {
+          const deepInsights = await this.deepThinkingAgent.analyzeFailure({
+            proposalId,
+            tenantId,
+            attemptCount: attemptNumber - 1, // Previous attempt number
+            transcriptionText: processedTranscript,
+            clientContext: clientData,
+            companyProfile: null, // Could be added if available
+            previousErrors,
+            lastGeneratedProposal: lastGeneratedContent,
+          });
+
+          // Generate enhanced prompt instructions from insights
+          deepThinkingInstructions =
+            this.deepThinkingAgent.generateEnhancedPromptInstructions(deepInsights);
+
+          this.logger.log(
+            `[DeepThinkingAgent] Analysis complete. Confidence: ${deepInsights.confidenceScore}%`,
+            {
+              proposalId,
+              rootCause: deepInsights.rootCause,
+              missingFields: deepInsights.missingFields,
+              recommendations: deepInsights.recommendations.length,
+              event: 'deep_thinking_analysis_completed',
+            },
+          );
+        } catch (error) {
+          this.logger.error(
+            `[DeepThinkingAgent] Analysis failed: ${error.message}`,
+            {
+              proposalId,
+              attemptNumber,
+              event: 'deep_thinking_analysis_failed',
+            },
+          );
+          // Continue with generation even if analysis fails
+        }
+      }
 
       // Enhance system prompt with learning insights and discovery context
       let systemPrompt = `You are an expert proposal writer for ${clientData.industry || 'digital'} agencies.
@@ -1481,6 +1709,16 @@ Your proposals have a track record of winning deals by understanding client need
       if (insights.improvementSuggestions.length > 0) {
         systemPrompt += `\n\nIMPORTANT IMPROVEMENTS based on recent feedback:
 ${insights.improvementSuggestions.map((s, i) => `${i + 1}. ${s}`).join('\n')}`;
+      }
+
+      // Add DeepThinkingAgent instructions (if analyzing a previous failure)
+      if (deepThinkingInstructions) {
+        systemPrompt += deepThinkingInstructions;
+        this.logger.log(`[DeepThinkingAgent] Enhanced prompt with analysis insights`, {
+          proposalId,
+          attemptNumber,
+          event: 'deep_thinking_prompt_enhanced',
+        });
       }
 
       // Build message array
@@ -2046,6 +2284,69 @@ Generate a compelling proposal following the format of the winning examples abov
         contextPackUsed: useContextPack && !!contextPack,
         tokenSavings: contextPack?.tokenSavings,
       };
+
+      // Validate generated content for multi-pass refinement
+      const validationErrors = this.validateProposalContent(content);
+
+      if (validationErrors.length > 0) {
+        this.logger.warn(
+          `Proposal content validation failed (attempt ${attemptNumber}/${MAX_ATTEMPTS})`,
+          {
+            proposalId,
+            tenantId,
+            errorCount: validationErrors.length,
+            errors: validationErrors.map((e) => `${e.field}: ${e.issue}`),
+            event: 'proposal_validation_failed',
+          },
+        );
+
+        // If we haven't exceeded max attempts, retry with DeepThinkingAgent analysis
+        if (attemptNumber < MAX_ATTEMPTS && proposalId) {
+          this.logger.log(
+            `Retrying proposal generation (attempt ${attemptNumber + 1}/${MAX_ATTEMPTS})`,
+            {
+              proposalId,
+              tenantId,
+              event: 'proposal_generation_retry',
+            },
+          );
+
+          // Recursively call with incremented attempt number and validation errors
+          return this.generateProposalContentWithLearning(
+            tenantId,
+            clientData,
+            transcriptData,
+            sections,
+            wonProposalExamples,
+            discoveryContext,
+            maxTokens,
+            proposalId,
+            attemptNumber + 1,
+            validationErrors,
+            content, // Pass failed content for DeepThinkingAgent analysis
+          );
+        } else {
+          // Max attempts reached - return content anyway with warning
+          this.logger.error(
+            `Max attempts reached (${MAX_ATTEMPTS}). Returning content despite validation errors.`,
+            {
+              proposalId,
+              tenantId,
+              errorCount: validationErrors.length,
+              event: 'proposal_max_attempts_reached',
+            },
+          );
+        }
+      } else {
+        this.logger.log(
+          `Proposal content validation passed (attempt ${attemptNumber})`,
+          {
+            proposalId,
+            tenantId,
+            event: 'proposal_validation_passed',
+          },
+        );
+      }
 
       return content;
     } catch (error) {

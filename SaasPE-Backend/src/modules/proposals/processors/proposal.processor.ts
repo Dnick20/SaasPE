@@ -199,6 +199,9 @@ export class ProposalProcessor implements OnModuleInit {
           transcriptData,
           sections,
           wonProposalExamples.length > 0 ? wonProposalExamples : undefined,
+          undefined, // discoveryContext
+          4000, // maxTokens
+          proposalId, // proposalId for DeepThinkingAgent
         );
 
       const aiDuration = Date.now() - aiStartTime;

@@ -1,8 +1,3 @@
-// @ts-nocheck
-// TODO: Remove this directive and fix TypeScript errors
-// Requires refactoring ProposalEditorProps to use strict typing
-// instead of [key: string]: unknown which causes multiple type errors
-// Related to Error #005 hardening - future improvement
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -39,12 +34,16 @@ import {
 } from 'lucide-react';
 import { PricingOptionsBuilder } from './pricing-options-builder';
 import { pricingCatalogApi, PricingCatalogItem } from '@/lib/api/endpoints/pricingCatalog';
-import { TimelineBuilder, TimelinePhase } from './TimelineBuilder';
+import { TimelineBuilder } from './TimelineBuilder';
+import { ScopeOfWorkBuilder } from './ScopeOfWorkBuilder';
+import { DeliverablesBuilder } from './DeliverablesBuilder';
 import { proposalsApi } from '@/lib/api/endpoints/proposals';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { downloadPdfFromUrl } from '@/lib/download-helpers';
 import { apiClient } from '@/lib/api/client';
+import type { Proposal, ScopeOfWorkItem, DeliverableItem, ProposedProjectPhase } from '@/types/proposal';
+import { normalizeScopeOfWork, normalizeDeliverables, normalizeTimeline } from '@/utils/proposal-normalizers';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,34 +56,46 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-const phaseSchema = z.object({
+const scopeItemSchema = z.object({
   title: z.string().min(1),
-  start: z.string().optional(),
-  end: z.string().optional(),
-  status: z.enum(['planned', 'in_progress', 'complete']).optional(),
-  notes: z.string().optional(),
+  objective: z.string().optional(),
+  keyActivities: z.array(z.string()).optional(),
+  outcome: z.string().optional(),
+});
+
+const deliverableSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+});
+
+const phaseSchema = z.object({
+  phase: z.string().min(1),
+  commitment: z.string(),
+  window: z.string().optional(),
+  focus: z.string(),
+  bullets: z.array(z.string()),
+  estimatedHours: z.object({
+    perMonth: z.number(),
+    perWeek: z.number(),
+  }),
 });
 
 const proposalSchema = z.object({
   title: z.string().min(1, 'Title is required'),
   executiveSummary: z.string().optional(),
   objectivesAndOutcomes: z.string().optional(),
-  scopeOfWork: z.string().optional(),
-  deliverables: z.string().optional(),
+  scopeOfWork: z.array(scopeItemSchema).optional(),
+  deliverables: z.array(deliverableSchema).optional(),
   approachAndTools: z.string().optional(),
   paymentTerms: z.string().optional(),
   cancellationNotice: z.string().optional(),
-  timeline: z.union([z.string(), z.array(phaseSchema)]).optional(),
+  timeline: z.array(phaseSchema).optional(),
 });
 
 type ProposalFormData = z.infer<typeof proposalSchema>;
 
 interface ProposalEditorProps {
-  proposal: {
-    id: string;
-    status: string;
-    [key: string]: unknown;
-  };
+  proposal: Proposal;
 }
 
 export function ProposalEditor({ proposal }: ProposalEditorProps) {
@@ -130,60 +141,35 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
     }
   }, [proposal.pricing, pricingOptions.length]);
 
-  // Helper function to convert JSON array to readable string
-  const convertToEditableString = (value: unknown): string => {
-    if (typeof value === 'string') {
-      return value;
-    }
-    if (Array.isArray(value)) {
-      // Convert array of objects to formatted text
-      return value.map((item, index) => {
-        if (typeof item === 'string') return item;
-        if (typeof item === 'object' && item !== null) {
-          const lines: string[] = [];
-          if (item.title) lines.push(`${item.title}`);
-          if (item.objective) lines.push(`Objective: ${item.objective}`);
-          if (item.keyActivities && Array.isArray(item.keyActivities)) {
-            lines.push('Key Activities:');
-            item.keyActivities.forEach((activity: string) => lines.push(`  - ${activity}`));
-          }
-          if (item.outcome) lines.push(`Outcome: ${item.outcome}`);
-          if (item.description) lines.push(item.description);
-          if (item.name) lines.push(item.name);
-          return lines.join('\n');
-        }
-        return String(item);
-      }).join('\n\n');
-    }
-    return '';
-  };
-
   const {
     register,
     handleSubmit,
     setValue,
     watch,
+    trigger,
+    getValues,
     formState: { errors, isDirty },
   } = useForm<ProposalFormData>({
     resolver: zodResolver(proposalSchema),
     defaultValues: {
-      title: (proposal.title as string) || '',
-      executiveSummary: (proposal.executiveSummary as string) || '',
-      objectivesAndOutcomes: (proposal.objectivesAndOutcomes as string) || '',
-      scopeOfWork: convertToEditableString(proposal.scopeOfWork),
-      deliverables: convertToEditableString(proposal.deliverables),
-      approachAndTools: (proposal.approachAndTools as string) || '',
-      paymentTerms: (proposal.paymentTerms as string) || '',
-      cancellationNotice: (proposal.cancellationNotice as string) || '',
-      timeline: Array.isArray(proposal.timeline) ? proposal.timeline : ((proposal.timeline as string) || ''),
+      title: proposal.title || '',
+      executiveSummary: proposal.executiveSummary || '',
+      objectivesAndOutcomes: proposal.objectivesAndOutcomes || '',
+      scopeOfWork: normalizeScopeOfWork(proposal.scopeOfWork),
+      deliverables: normalizeDeliverables(proposal.deliverables),
+      approachAndTools: proposal.approachAndTools || '',
+      paymentTerms: proposal.paymentTerms || '',
+      cancellationNotice: proposal.cancellationPolicy || '',
+      timeline: normalizeTimeline(proposal.timeline || proposal.proposedProjectPhases),
     },
   });
   // Debounced partial save for sections
   const savingRef = useRef(false);
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
+  const scopeOfWorkValue = watch('scopeOfWork');
+  const deliverablesValue = watch('deliverables');
   const timelineValue = watch('timeline');
-  const timelinePhases: TimelinePhase[] = Array.isArray(timelineValue) ? timelineValue as TimelinePhase[] : [];
 
   // Warn user about unsaved changes when leaving page
   useEffect(() => {
@@ -204,15 +190,17 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
       debounceTimer.current = setTimeout(async () => {
         try {
           savingRef.current = true;
+          // Use getValues() to get current form state instead of reading DOM
+          const currentValues = getValues();
           const payload: Partial<ProposalFormData> = fields ?? {
-            executiveSummary: (document.getElementById('executiveSummary') as HTMLTextAreaElement)?.value,
-            objectivesAndOutcomes: (document.getElementById('objectivesAndOutcomes') as HTMLTextAreaElement)?.value,
-            scopeOfWork: (document.getElementById('scopeOfWork') as HTMLTextAreaElement)?.value,
-            deliverables: (document.getElementById('deliverables') as HTMLTextAreaElement)?.value,
-            approachAndTools: (document.getElementById('approachAndTools') as HTMLTextAreaElement)?.value,
-            paymentTerms: (document.getElementById('paymentTerms') as HTMLTextAreaElement)?.value,
-            cancellationNotice: (document.getElementById('cancellationNotice') as HTMLTextAreaElement)?.value,
-            timeline: Array.isArray(timelineValue) ? timelineValue : timelinePhases,
+            executiveSummary: currentValues.executiveSummary,
+            objectivesAndOutcomes: currentValues.objectivesAndOutcomes,
+            scopeOfWork: currentValues.scopeOfWork,
+            deliverables: currentValues.deliverables,
+            approachAndTools: currentValues.approachAndTools,
+            paymentTerms: currentValues.paymentTerms,
+            cancellationNotice: currentValues.cancellationNotice,
+            timeline: currentValues.timeline,
           };
           await proposalsApi.updateSections(proposal.id, payload as any);
           toast.success('Saved');
@@ -224,7 +212,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
         }
       }, 600);
     },
-    [proposal.id, timelinePhases, timelineValue]
+    [proposal.id, getValues]
   );
 
   const isLocked = proposal.status === 'sent' || proposal.status === 'signed' || !!proposal.clientSignedAt;
@@ -257,7 +245,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
 
       await proposalsApi.update(proposal.id, {
         ...data,
-        timeline: Array.isArray(data.timeline) ? data.timeline : timelinePhases,
+        timeline: data.timeline || [],
         pricingOptions: pricingOptions,
       } as any);
 
@@ -780,7 +768,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                 <div className="p-4 bg-green-50 rounded-lg">
                   <p className="text-sm font-medium text-green-900 mb-1">Created</p>
                   <p className="text-lg font-semibold text-green-700">
-                    {new Date(proposal.created as string).toLocaleDateString()}
+                    {new Date(proposal.createdAt as string).toLocaleDateString()}
                   </p>
                 </div>
               </div>
@@ -916,7 +904,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
             <TabsContent value="scope" className="space-y-4 mt-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="scopeOfWork">Scope of Work</Label>
+                  <Label>Scope of Work</Label>
                   {proposal.transcriptionId && !isLocked && (
                     <Button
                       type="button"
@@ -934,31 +922,20 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 mb-2">
-                  Define the boundaries and extent of work to be performed
-                </p>
-                <Textarea
-                  id="scopeOfWork"
-                  {...register('scopeOfWork')}
-                  rows={12}
-                  className="resize-y"
-                  placeholder="Describe the scope of work, what's included and excluded from this project..."
+                <ScopeOfWorkBuilder
+                  value={scopeOfWorkValue || []}
+                  onChange={(items) => setValue('scopeOfWork', items, { shouldDirty: true })}
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  Recommended: Clear boundaries of what will and won't be done
-                </p>
               </div>
 
               <div>
-                <Label htmlFor="timeline">
+                <Label>
                   <Calendar className="h-4 w-4 inline mr-1" />
                   Project Timeline
                 </Label>
                 <TimelineBuilder
-                  value={timelinePhases}
-                  onChange={(phases) => {
-                    setValue('timeline', phases);
-                  }}
+                  value={timelineValue || []}
+                  onChange={(phases) => setValue('timeline', phases, { shouldDirty: true })}
                 />
               </div>
             </TabsContent>
@@ -967,7 +944,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
             <TabsContent value="deliverables" className="space-y-4 mt-6">
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="deliverables">Deliverables</Label>
+                  <Label>Deliverables</Label>
                   {proposal.transcriptionId && !isLocked && (
                     <Button
                       type="button"
@@ -985,19 +962,10 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-gray-500 mb-2">
-                  List the specific outputs and tangible items that will be delivered
-                </p>
-                <Textarea
-                  id="deliverables"
-                  {...register('deliverables')}
-                  rows={12}
-                  className="resize-y"
-                  placeholder="List all deliverables, documents, and outputs that will be provided..."
+                <DeliverablesBuilder
+                  value={deliverablesValue || []}
+                  onChange={(items) => setValue('deliverables', items, { shouldDirty: true })}
                 />
-                <p className="text-xs text-gray-400 mt-1">
-                  Recommended: Clear list of tangible outputs with specifications
-                </p>
               </div>
             </TabsContent>
 
@@ -1207,7 +1175,7 @@ export function ProposalEditor({ proposal }: ProposalEditorProps) {
                               taxPct: base.taxPct,
                             };
                           })
-                          .filter(Boolean) as Array<{ name: string; type: string; unitPrice: number; quantity: number; billingPeriod?: string; taxPct?: number }>;
+                          .filter(Boolean) as any;
                         try {
                           const updated = await proposalsApi.updatePricing(proposal.id, { items });
                           toast.success('Pricing updated');

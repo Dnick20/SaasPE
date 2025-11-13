@@ -59,11 +59,12 @@ model Tenant {
   tokenTransactions   TokenTransaction[]
 
   // NEW: AI Learning & Email Credits
-  aiGenerationFeedback AIGenerationFeedback[]
-  emailCredits         TenantEmailCredits?
-  contacts             Contact[]
-  supportConversations SupportConversation[]
-  bulkImportJobs       BulkImportJob[]
+  aiGenerationFeedback  AIGenerationFeedback[]
+  proposalLearningLogs  ProposalLearningLog[]  @relation("proposalLearningLogs")
+  emailCredits          TenantEmailCredits?
+  contacts              Contact[]
+  supportConversations  SupportConversation[]
+  bulkImportJobs        BulkImportJob[]
 
   // NEW: Branding
   branding TenantBranding?
@@ -443,6 +444,9 @@ model Proposal {
   pricingOptionsV2 ProposalPricingOption[] @relation("pricingOptionsV2") // Replaces pricingOptions Json[]
   pricingNotesV2   ProposalPricingNote[]   @relation("pricingNotesV2") // Global pricing notes
 
+  // AI Learning & Improvement
+  learningLogs ProposalLearningLog[] @relation("learningLogs") // Deep analysis logs for failed generation attempts
+
   @@index([tenantId])
   @@index([clientId])
   @@index([status])
@@ -539,6 +543,37 @@ model ProposalPricingNote {
   @@index([proposalId])
   @@index([noteType])
   @@index([sortOrder])
+}
+
+// ============================================================================
+// AI LEARNING & IMPROVEMENT
+// ============================================================================
+
+model ProposalLearningLog {
+  id         String   @id @default(uuid())
+  proposalId String
+  proposal   Proposal @relation("learningLogs", fields: [proposalId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant   @relation("proposalLearningLogs", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Failure Context
+  attemptCount      Int      // Which generation attempt this log is for
+  validationErrors  String   @db.Text // JSON string of validation errors
+
+  // Deep Analysis Results
+  rootCause         String   @db.Text // Primary reason for failure
+  missingFields     String[] // Array of missing field names
+  malformedFields   String[] // Array of fields with formatting issues
+  recommendations   String[] // Actionable recommendations
+  promptAdjustments String[] // Suggested prompt modifications
+  confidenceScore   Int      // 0-100 confidence in the analysis
+
+  created DateTime @default(now())
+
+  @@index([proposalId])
+  @@index([tenantId])
+  @@index([attemptCount])
+  @@index([created])
 }
 
 // ============================================================================
