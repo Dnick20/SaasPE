@@ -109,9 +109,9 @@ export const envSchema = z.object({
   NODE_ENV: NodeEnv.default('development'),
   PORT: portSchema.default(3000),
 
-  // URLs
-  BACKEND_URL: urlSchema,
-  FRONTEND_URL: urlSchema,
+  // URLs (made optional for backwards compatibility)
+  BACKEND_URL: urlSchema.optional(),
+  FRONTEND_URL: urlSchema.optional(),
 
   // Database
   DATABASE_URL: postgresUrlSchema,
@@ -183,24 +183,25 @@ export const envSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log'),
 })
+  // Commented out e-signature provider requirement for deployment flexibility
+  // .refine(
+  //   (data) => {
+  //     // At least one e-signature provider must be configured
+  //     const hasDocuSign = !!(data.DOCUSIGN_CLIENT_ID && data.DOCUSIGN_CLIENT_SECRET);
+  //     const hasAdobeSign = !!(data.ADOBE_SIGN_CLIENT_ID && data.ADOBE_SIGN_CLIENT_SECRET);
+  //     const hasSignNow = !!(data.SIGNNOW_CLIENT_ID && data.SIGNNOW_CLIENT_SECRET);
+  //     const hasGoogle = !!(data.GOOGLE_CLIENT_ID && data.GOOGLE_CLIENT_SECRET);
+  //
+  //     return hasDocuSign || hasAdobeSign || hasSignNow || hasGoogle;
+  //   },
+  //   {
+  //     message: 'At least one e-signature provider (DocuSign, Adobe Sign, SignNow, or Google) must be configured',
+  //   }
+  // )
   .refine(
     (data) => {
-      // At least one e-signature provider must be configured
-      const hasDocuSign = !!(data.DOCUSIGN_CLIENT_ID && data.DOCUSIGN_CLIENT_SECRET);
-      const hasAdobeSign = !!(data.ADOBE_SIGN_CLIENT_ID && data.ADOBE_SIGN_CLIENT_SECRET);
-      const hasSignNow = !!(data.SIGNNOW_CLIENT_ID && data.SIGNNOW_CLIENT_SECRET);
-      const hasGoogle = !!(data.GOOGLE_CLIENT_ID && data.GOOGLE_CLIENT_SECRET);
-
-      return hasDocuSign || hasAdobeSign || hasSignNow || hasGoogle;
-    },
-    {
-      message: 'At least one e-signature provider (DocuSign, Adobe Sign, SignNow, or Google) must be configured',
-    }
-  )
-  .refine(
-    (data) => {
-      // No localhost in production URLs
-      if (data.NODE_ENV === 'production') {
+      // No localhost in production URLs (only check if URLs are provided)
+      if (data.NODE_ENV === 'production' && data.BACKEND_URL && data.FRONTEND_URL) {
         return (
           !data.BACKEND_URL.includes('localhost') &&
           !data.FRONTEND_URL.includes('localhost')
