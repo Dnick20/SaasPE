@@ -4,6 +4,7 @@ import { CloudWatchService } from './cloudwatch.service';
 import { SecretsManagerService } from './secrets-manager.service';
 import { OpenAIService } from './openai.service';
 import { S3Service } from './s3.service';
+import { PdfService } from './pdf.service';
 import { WebsiteScraperService } from './website-scraper.service';
 import { PrismaService } from '../database/prisma.service';
 import { CloudflareDNSService } from './cloudflare.service';
@@ -40,6 +41,7 @@ import { DeepThinkingAgentService } from './deep-thinking-agent.service';
     SecretsManagerService,
     OpenAIService,
     S3Service,
+    PdfService,
     WebsiteScraperService,
     PrismaService,
     CloudflareDNSService,
@@ -56,6 +58,7 @@ import { DeepThinkingAgentService } from './deep-thinking-agent.service';
     SecretsManagerService,
     OpenAIService,
     S3Service,
+    PdfService,
     WebsiteScraperService,
     CloudflareDNSService,
     RegistrarService,
