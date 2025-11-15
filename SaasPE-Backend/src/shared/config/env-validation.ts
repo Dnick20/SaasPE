@@ -17,11 +17,9 @@ export function validateEnvironment(): EnvValidationResult {
   const warnings: string[] = [];
   const missingOptional: string[] = [];
 
-  // Required variables
+  // Required variables (BACKEND_URL and FRONTEND_URL made optional for deployment flexibility)
   const required = [
     'DATABASE_URL',
-    'BACKEND_URL',
-    'FRONTEND_URL',
     'ENCRYPTION_KEY',
     'OPENAI_API_KEY',
     'JWT_SECRET',
@@ -110,9 +108,10 @@ export function validateEnvironment(): EnvValidationResult {
     }
   }
 
+  // Made optional for deployment flexibility
   if (!hasProvider) {
-    errors.push(
-      'At least one e-signature provider must be configured (DocuSign, Adobe Sign, SignNow, or Google Workspace)',
+    warnings.push(
+      'No e-signature provider configured (DocuSign, Adobe Sign, SignNow, or Google Workspace) - e-signature features will be disabled',
     );
   } else {
     logger.log(`Configured providers: ${configuredProviders.join(', ')}`);
