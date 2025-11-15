@@ -14,6 +14,9 @@ import { WordExporterService } from './word-exporter.service';
 import { ConfidenceScoringService } from './confidence-scoring.service';
 import { MultiPassExtractionService } from './multi-pass-extraction.service';
 import { DeepThinkingAgentService } from './deep-thinking-agent.service';
+import { EditTrackingService } from './edit-tracking.service';
+import { FeedbackValidationService } from './feedback-validation.service';
+import { PatternExtractionService } from './pattern-extraction.service';
 
 /**
  * Shared Services Module
@@ -51,6 +54,9 @@ import { DeepThinkingAgentService } from './deep-thinking-agent.service';
     ConfidenceScoringService,
     MultiPassExtractionService,
     DeepThinkingAgentService,
+    EditTrackingService,
+    FeedbackValidationService,
+    PatternExtractionService,
   ],
   exports: [
     EncryptionService,
@@ -67,6 +73,9 @@ import { DeepThinkingAgentService } from './deep-thinking-agent.service';
     ConfidenceScoringService,
     MultiPassExtractionService,
     DeepThinkingAgentService,
+    EditTrackingService,
+    FeedbackValidationService,
+    PatternExtractionService,
   ],
 })
 export class ServicesModule {}
