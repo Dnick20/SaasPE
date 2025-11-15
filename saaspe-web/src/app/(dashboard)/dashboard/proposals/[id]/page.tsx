@@ -3,7 +3,7 @@
 
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-import { ArrowLeft, Download, Send, FileText, Loader2, Sparkles, PenTool, CheckCircle2, Clock, Rocket, CreditCard, XCircle, Edit } from 'lucide-react';
+import { ArrowLeft, Download, Send, FileText, Loader2, Sparkles, PenTool, Rocket, CreditCard, XCircle, Edit } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,7 @@ import { AxiosError } from 'axios';
 import { AgencySignatureDialog } from '@/components/proposals/agency-signature-dialog';
 import { SendToClientDialog } from '@/components/proposals/send-to-client-dialog';
 import { SignatureStatusTracker } from '@/components/proposals/signature-status-tracker';
+import { TimelineDisplay } from '@/components/proposals/TimelineDisplay';
 import { useCustomerJourney } from '@/lib/journey/use-customer-journey';
 import { JourneyActionPanel } from '@/components/journey/JourneyActionPanel';
 
@@ -355,56 +356,7 @@ export default function ProposalDetailPage({ params }: ProposalDetailPageProps) 
             <CardTitle>Project Timeline</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="prose max-w-none">
-              {Array.isArray(proposal.timeline) ? (
-                <div className="relative">
-                  <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gray-200" />
-                  <div className="space-y-4">
-                    {proposal.timeline.map((phase: { status?: string; title?: string; start?: string; end?: string; notes?: string }, idx: number) => (
-                      <div key={idx} className="relative pl-10">
-                        <div className="absolute left-0 top-1.5 h-6 w-6 rounded-full bg-white border border-gray-300 flex items-center justify-center">
-                          {phase.status === 'complete' ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-600" />
-                          ) : phase.status === 'in_progress' ? (
-                            <Clock className="h-4 w-4 text-blue-600" />
-                          ) : (
-                            <FileText className="h-4 w-4 text-gray-500" />
-                          )}
-                        </div>
-                        <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-semibold text-gray-900">{phase.title || `Phase ${idx + 1}`}</h4>
-                            <span className="text-xs text-gray-500">
-                              {(phase.start || phase.end) && (
-                                <>
-                                  {phase.start || 'TBD'} — {phase.end || 'TBD'}
-                                </>
-                              )}
-                            </span>
-                          </div>
-                          {phase.notes && (
-                            <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{phase.notes}</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : typeof proposal.timeline === 'string' ? (
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
-                  {proposal.timeline}
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(proposal.timeline).map(([key, value]) => (
-                    <div key={key} className="border-l-4 border-purple-500 pl-4">
-                      <h4 className="font-semibold text-gray-900 mb-1">{key}</h4>
-                      <p className="text-gray-700">{String(value)}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            <TimelineDisplay timeline={proposal.timeline} />
           </CardContent>
         </Card>
       )}
