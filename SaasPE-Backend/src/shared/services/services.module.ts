@@ -17,6 +17,10 @@ import { DeepThinkingAgentService } from './deep-thinking-agent.service';
 import { EditTrackingService } from './edit-tracking.service';
 import { FeedbackValidationService } from './feedback-validation.service';
 import { PatternExtractionService } from './pattern-extraction.service';
+import { DocuSignService } from './docusign.service';
+import { AdobeSignService } from './adobe-sign.service';
+import { SignNowService } from './signnow.service';
+import { GoogleWorkspaceSignatureService } from './google-workspace-signature.service';
 
 /**
  * Shared Services Module
@@ -57,6 +61,10 @@ import { PatternExtractionService } from './pattern-extraction.service';
     EditTrackingService,
     FeedbackValidationService,
     PatternExtractionService,
+    DocuSignService,
+    AdobeSignService,
+    SignNowService,
+    GoogleWorkspaceSignatureService,
   ],
   exports: [
     EncryptionService,
@@ -76,6 +84,10 @@ import { PatternExtractionService } from './pattern-extraction.service';
     EditTrackingService,
     FeedbackValidationService,
     PatternExtractionService,
+    DocuSignService,
+    AdobeSignService,
+    SignNowService,
+    GoogleWorkspaceSignatureService,
   ],
 })
 export class ServicesModule {}
