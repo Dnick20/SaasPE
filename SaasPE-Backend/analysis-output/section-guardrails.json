@@ -1,0 +1,564 @@
+{
+  "overview": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 184,
+    "targetWords": 39,
+    "mustInclude": [
+      "company name",
+      "value proposition"
+    ],
+    "shouldAvoid": [
+      "jargon",
+      "overly complex language",
+      "ambiguity"
+    ],
+    "examplePhrases": [
+      "WarmUp\nand\nClient\nEvery\nWeek\n2\nDoc ID: 9dde3959693b99de6351fc32dc8db1cc844f3185\n\n--- Page 3 ---",
+      "(hereafter\nthe\nCompany)\nfor\nassistance\nsetting\nup\nan\nintelligent\noutbound\nmotion\nthat\nrelies\non\ndata-driven\ntriggers\n(to\nbe\ndetermined)",
+      "============================================================\n\nSustainment faces two critical challenges that require distinct but complementary solutions:\nPhase 1 - Immediate Pipeline Generation (Weeks 1-8)",
+      "that\nincludes\nour\nsuggestions\nabout\nwhat\nto\ndo\nnext",
+      "of\nwhat\nto\nexpect:\nWeeks\n1-2\nSetup\nand\nProject\nplan\nfinalized\nincluding\n●\norientation\nof\nclient\nbusiness\n●\nroles\n&\nresponsibilities\ndocumented\n●\ntechnology\naccounts\ncreated\n●\nclient\nadds\nwebsite\ntracking\non\nwebsite\n●\ndomain\nand\nmailbox\nsetup\n●\nIdeal\nClient\nprofile\nand\noffers\nidentified\n●\n15\nminutes\nweekly\nof\nClient\nCEO/executive\ninputs\nfor\nLinkedIn\ncontent\n●\ncollateral\nidentified\nand\nClient\nprovides\nto\nWarmUp\n●\nWarmUp"
+    ]
+  },
+  "executiveSummary": {
+    "required": true,
+    "format": "text with specific requirements",
+    "length": "2-3 paragraphs",
+    "firstParagraphWords": {"min": 40, "max": 60},
+    "tone": "consultative, transparent",
+    "mustInclude": [
+      "data-driven triggers (funding rounds, leadership changes, etc.)",
+      "channels: outbound email, LinkedIn prospecting & content, calls to high-intent signals",
+      "tools where applicable: HeyReach.io, RB2B.com, Clay.com, Smartlead.ai, HubSpot"
+    ],
+    "shouldAvoid": [
+      "generic statements without specifics",
+      "missing trigger types",
+      "no channel mentions",
+      "no tool citations"
+    ],
+    "validation": {
+      "paragraphCount": {"min": 2, "max": 3},
+      "firstParagraphLength": {"min": 40, "max": 60},
+      "includesTriggers": true,
+      "includesChannels": true,
+      "includesTools": true
+    },
+    "examplePhrases": [
+      "data-driven triggers such as funding rounds and leadership changes",
+      "multi-channel approach including outbound email, LinkedIn prospecting, and calls to high-intent signals",
+      "leveraging tools like HeyReach.io, RB2B.com, Clay.com, Smartlead.ai, and HubSpot"
+    ]
+  },
+  "objectivesAndOutcomes": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 1567,
+    "targetWords": 334,
+    "mustInclude": [
+      "goals",
+      "success metrics",
+      "ROI"
+    ],
+    "shouldAvoid": [
+      "jargon",
+      "overly complex language",
+      "ambiguity"
+    ],
+    "examplePhrases": [
+      "But then you run a regression regression analysis, then you enrich those companies a bunch, like with crazy stuff, like whatever you can think of, right, to try to find some trends",
+      "And we'd like to try this signal for this client and we know we've got 40 hours with Mike, and his team as like a fractional rev ops resource to go build a like, yeah, if the reps aren't going to build the workflows, you know, rev, that would be in a SaaS company, that would be the that would be the function of the rev ops team, right would be to like put these things in place that either marketing or sales doesn't know how to do, or they don't have the time to do right, but someone thinks it's going to be valuable to those teams or to the company",
+      "Because people think, I think, again, I think you all have a much better sort of understanding of, you've really been students of like your own churn and your clients and stuff",
+      "But what's kind of cool about that is you take the output of that and you put it into a clay table and you enrich it a bunch, because it's not a huge data set usually",
+      "Based on our recent conversation with Joe Mundell and Bryan Mitchell, we've"
+    ]
+  },
+  "scopeOfWork": {
+    "required": true,
+    "format": "array of structured work items",
+    "minItems": 4,
+    "maxItems": 6,
+    "structure": {
+      "title": "string - work item title",
+      "objective": "string - goal statement mentioning client name",
+      "keyActivities": "array of strings - minimum 3 activities",
+      "outcome": "string - expected result"
+    },
+    "validation": {
+      "arrayLength": {"min": 4, "max": 6},
+      "titleRequired": true,
+      "objectiveRequired": true,
+      "keyActivitiesMinLength": 3,
+      "outcomeRequired": true
+    },
+    "verbStyle": "action-led, no fluff",
+    "mustInclude": [
+      "all four fields per item",
+      "action verbs in keyActivities",
+      "client-specific objectives"
+    ],
+    "shouldAvoid": [
+      "generic objectives",
+      "vague activities",
+      "missing outcomes"
+    ],
+    "example": [
+      {
+        "title": "HubSpot CRM Implementation",
+        "objective": "Implement a unified CRM tailored to client needs",
+        "keyActivities": [
+          "Configure HubSpot CRM to centralize customer data and improve pipeline visibility.",
+          "Integrate HubSpot with Clay.com for data flow and prospecting insights.",
+          "Create customized dashboards and reporting tailored to KPIs."
+        ],
+        "outcome": "Improved collaboration, transparency, and efficiency across the sales team."
+      }
+    ]
+  },
+  "deliverables": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 151,
+    "targetWords": 34,
+    "mustInclude": [
+      "tangible outputs",
+      "timeline reference"
+    ],
+    "shouldAvoid": [
+      "jargon",
+      "overly complex language",
+      "ambiguity"
+    ],
+    "examplePhrases": [
+      "warm scenarios (intent)",
+      "The\nsuccess\nof\nthe\nprogram\nis\noptimized\nwith\ntimely\nClient\nparticipation",
+      "============================================================\n\n\n============================================================\nWeekly Ranked Call Lists\n============================================================\n\nEvery Monday, your team receives:\nTop 100 prospects to contact that week (or more)\nPre-call research summaries\nRecent triggers/signals for each prospect\nScoring based on intent level and qualification of company\n\n============================================================\nSpecific Call Scripts\n============================================================\n\nOpening scripts for cold vs"
+    ]
+  },
+  "approachAndTools": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 384,
+    "targetWords": 114,
+    "mustInclude": [
+      "methodology",
+      "tools or platforms"
+    ],
+    "shouldAvoid": [
+      "jargon",
+      "overly complex language",
+      "ambiguity"
+    ],
+    "examplePhrases": [
+      "Well, when you guys first, when Aaron first, and when Aaron and I first talked about this, I, you know, what I kind of imagined is that we would build a template for how to launch this for your clients",
+      "Overall,\nWarmUp’s\nlead\ngeneration\nprogram\nwill\nconsist\nof\ndata-driven\noutbound\nemail,\nLinkedIn\nprospecting,\nand\nLinkedIn\ncontent\ncreation\nwith\nthe\ngoal\nof\ngenerating\n6-8\nwarm\nleads\nmonthly",
+      "Role & Function Filtering: We pull only relevant decision-makers based on titles, seniority, and job functions that match your buyer personas (VPs of Operations, Procurement, Supply Chain)\nData Cleaning: Generic titles (e",
+      "considered\nfor\nthis\nproject\nwill\ninclude\nRB2B",
+      "The more context you provide about your manufacturing nuances, the sharper our targeting becomes\nCustom Filtering: We apply highly specific filters (employee count, tech stack, NAICS codes, location) and review them with you before using any credits\nClient Sign-Off: No list is finalized without your review and green light"
+    ]
+  },
+  "timeline": {
+    "required": true,
+    "format": "structured JSON object",
+    "structure": {
+      "type": "object",
+      "requiredFields": ["workItems", "phases"],
+      "description": "Timeline MUST be returned as exact JSON with BOTH arrays"
+    },
+    "workItems": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 6,
+      "itemStructure": {
+        "workItem": "string - specific work item name",
+        "description": "string - concise, action-oriented description",
+        "owner": "enum - MUST be one of: 'WarmUp', 'Client', or 'WarmUp and Client'",
+        "weeks": "string - MUST match format 'Week X–Y' or 'Weeks X–Y'"
+      },
+      "example": {
+        "workItem": "Email Infrastructure Setup",
+        "description": "Buy domains, set mailboxes, warmup accounts…",
+        "owner": "WarmUp",
+        "weeks": "Week 1–2"
+      }
+    },
+    "phases": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 5,
+      "itemStructure": {
+        "phase": "string - descriptive phase name",
+        "weeks": "string - MUST match format 'Week X–Y' or 'Weeks X–Y'",
+        "tasks": "array of strings - short, action-led tasks"
+      },
+      "example": {
+        "phase": "Discovery and Planning",
+        "weeks": "Weeks 1–2",
+        "tasks": [
+          "Kickoff meeting, system audit, confirm KPIs, finalize plan"
+        ]
+      }
+    },
+    "validation": {
+      "totalRows": {
+        "min": 6,
+        "max": 10,
+        "note": "Combined total across workItems and phases arrays"
+      },
+      "weeksFormat": "Must use en-dash (–) not hyphen (-)",
+      "ownerValues": ["WarmUp", "Client", "WarmUp and Client"],
+      "descriptionStyle": "Concise, action-oriented, uses ellipsis (…) for continuation"
+    },
+    "mustInclude": [
+      "workItems array with 3-6 items",
+      "phases array with 3-5 items",
+      "owner field in each workItem (WarmUp, Client, or WarmUp and Client)",
+      "weeks field in proper format (Week X–Y or Weeks X–Y)",
+      "tasks array in each phase"
+    ],
+    "shouldAvoid": [
+      "incorrect week format (using hyphen instead of en-dash)",
+      "owner values outside allowed list",
+      "missing either workItems or phases array",
+      "overly verbose descriptions",
+      "ambiguous ownership"
+    ],
+    "promptInstructions": "Return timeline in EXACT JSON with BOTH arrays:\n- workItems: [{workItem, description, owner, weeks}]\n- phases: [{phase, weeks, tasks[]}]\n\nRules:\n- weeks must match \"Week X–Y\" or \"Weeks X–Y\"\n- 6–10 rows total across both tables\n- Owners use only: \"WarmUp\", \"Client\", or \"WarmUp and Client\"\n- Tasks are short, action‑led"
+  },
+  "pricing": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 197,
+    "targetWords": 57,
+    "mustInclude": [
+      "line items",
+      "total investment",
+      "what is included"
+    ],
+    "shouldAvoid": [
+      "hidden fees",
+      "vague terms",
+      "unclear breakdown"
+    ],
+    "examplePhrases": [
+      "com | $800 | $800 | $800\nTrigify",
+      "Domain Setup | $280 | $0 | $0\nMailboxes (136 @ $5/mo) | $680 | $680 | $680\nRB2B",
+      "io | $149 | $149 | $149\nInstantly",
+      "~$45,600\n \nannually\n \n●\n \nGrand\n \nEstimated\n \nTotal:\n \n~$89,200\n \n \nProposed",
+      "Projects  \nSmall Package  $3,500  30 hours/month  Basic outbound \nsetup, limited \ncampaigns"
+    ]
+  },
+  "paymentTerms": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 167,
+    "targetWords": 26,
+    "mustInclude": [
+      "payment schedule",
+      "billing terms"
+    ],
+    "shouldAvoid": [
+      "ambiguous dates",
+      "unclear penalties"
+    ],
+    "examplePhrases": [
+      "Any\nunused\nhours\nwithin\na\ngiven\nmonth\nwill\nbe\nforfeited\nand\ncannot\nbe\ncarried\nforward",
+      "are\ndue\n“On\nReceipt”\nevery\nmonth\non\nthe\n1st\nNon-Rolling\nHours\nClause:\nThe\nhours\nallocated\nunder\nthis\nagreement\nare\nprovided\nmonthly\nand\ndo\nnot\nroll\nover\nfrom\none\nmonth\nto\nthe\nnext",
+      "is\n \ndue\n \nby\n \nthe\n \n1\nst\n \nof\n \neach\n \nmonth\n \nfor\n \nthe\n \ncurrent\n \nmonth's\n \nwork",
+      "Each\nmonth's\nhours\nmust\nbe\nutilized\nwithin\nthat\nspecific\nmonth,\nand\nany\nunused\nhours\nwill\nnot\nbe\nrefunded\nor\ncredited",
+      "Terms:\nDue\nby\n1\nst\nof\neach \nmonth\nfor\ncurrent\nmonth\nwork\n4\nDoc ID: 3ae8e6acac9ce8116499d03dffaa30d5066e8c75\n\n--- Page 5 ---"
+    ]
+  },
+  "cancellationNotice": {
+    "required": true,
+    "minWords": 50,
+    "maxWords": 295,
+    "targetWords": 157,
+    "mustInclude": [
+      "notice period",
+      "conditions"
+    ],
+    "shouldAvoid": [
+      "unfair restrictions",
+      "hidden penalties"
+    ],
+    "examplePhrases": [
+      "By signing below, the Client accepts that their engagement will be automatically renewed monthly if no written notice is received",
+      "============================================================\nNext Steps\n============================================================\n\nReview and approve this proposal",
+      "Sonicu  \nBy:  By:  \nName: Mike Hurley  Name: Joe Mundell  \nTitle: CEO  Title: President  \nDate:  Date:  \n \n03 / 05 / 2025\n03 / 10 / 2025\nDoc ID: 6890edadd435b2eeb4c86fad0ffff3f6b036b082\n\n--- Page 5 ---\n\nUpdated Contract for Sonicu\nSonicu_Sales_Proposal_Feb2025",
+      "03 / 10 / 2025\n17:35:52 UTC",
+      "104\nThe document has been completed"
+    ]
+  },
+  "coverPageData": {
+    "required": true,
+    "format": "structured JSON object",
+    "description": "Order Form data displayed on cover page",
+    "structure": {
+      "client": {
+        "required": true,
+        "fields": {
+          "name": "string - client company name",
+          "primaryContacts": "array of strings - contact names"
+        },
+        "validation": {
+          "nameRequired": true,
+          "primaryContactsMinLength": 1
+        }
+      },
+      "preparedBy": {
+        "required": true,
+        "fields": {
+          "name": "string - WarmUp team member name",
+          "email": "string - valid email address"
+        },
+        "validation": {
+          "emailFormat": "must be valid email"
+        }
+      },
+      "commercials": {
+        "required": true,
+        "fields": {
+          "costPerMonth": "number - monthly cost without currency symbol",
+          "currency": "string - currency code (USD, EUR, etc.)",
+          "billingCadence": "enum - 'monthly' or 'annual'"
+        },
+        "validation": {
+          "costPerMonthType": "number",
+          "billingCadenceEnum": ["monthly", "annual"]
+        }
+      },
+      "term": {
+        "required": true,
+        "fields": {
+          "startDate": "string - ISO-8601 date (YYYY-MM-DD)",
+          "endDate": "string - ISO-8601 date (YYYY-MM-DD)",
+          "durationMonths": "number - calculated from start/end dates"
+        },
+        "validation": {
+          "dateFormat": "ISO-8601 (YYYY-MM-DD)",
+          "startBeforeEnd": true,
+          "durationMatchesDates": true
+        }
+      }
+    },
+    "example": {
+      "client": {
+        "name": "Sonicu",
+        "primaryContacts": ["Joe Mundell", "Bryan Mitchell"]
+      },
+      "preparedBy": {
+        "name": "Mike Hurley",
+        "email": "mike@sendwarmup.com"
+      },
+      "commercials": {
+        "costPerMonth": 5500,
+        "currency": "USD",
+        "billingCadence": "monthly"
+      },
+      "term": {
+        "startDate": "2025-03-10",
+        "endDate": "2025-06-10",
+        "durationMonths": 3
+      }
+    },
+    "mustInclude": [
+      "client.name",
+      "client.primaryContacts",
+      "preparedBy.name",
+      "preparedBy.email",
+      "commercials.costPerMonth",
+      "commercials.currency",
+      "commercials.billingCadence",
+      "term.startDate",
+      "term.endDate",
+      "term.durationMonths"
+    ],
+    "shouldAvoid": [
+      "currency symbols in costPerMonth (use number only)",
+      "invalid date formats (must be YYYY-MM-DD)",
+      "startDate after endDate",
+      "durationMonths not matching calculated months"
+    ]
+  },
+  "tableOfContents": {
+    "required": true,
+    "format": "array of TOC entries",
+    "description": "Table of contents with section titles and page numbers",
+    "structure": {
+      "type": "array",
+      "items": {
+        "title": "string - section title",
+        "page": "number or null (null in preview, PDF renderer fills)"
+      }
+    },
+    "defaultSections": [
+      "Overview",
+      "Key Priorities",
+      "Proposed Project Phases",
+      "Pricing Options",
+      "Next Steps",
+      "Payment Terms",
+      "Cancellation Notice"
+    ],
+    "example": [
+      { "title": "Overview", "page": null },
+      { "title": "Key Priorities", "page": null },
+      { "title": "Proposed Project Phases", "page": null },
+      { "title": "Pricing Options", "page": null },
+      { "title": "Next Steps", "page": null },
+      { "title": "Payment Terms", "page": null },
+      { "title": "Cancellation Notice", "page": null }
+    ],
+    "validation": {
+      "minEntries": 5,
+      "maxEntries": 10,
+      "pageNumbersOptional": true
+    },
+    "mustInclude": [
+      "at least 5 TOC entries",
+      "title field for each entry",
+      "page field (can be null)"
+    ],
+    "shouldAvoid": [
+      "duplicate titles",
+      "empty titles",
+      "inconsistent formatting"
+    ]
+  },
+  "keyPriorities": {
+    "required": true,
+    "format": "array of strings",
+    "description": "3-6 priority bullets, outcome-focused",
+    "minItems": 3,
+    "maxItems": 6,
+    "bulletStyle": "concise, outcome-focused, starts with action verb or result",
+    "example": [
+      "Generate 6-8 qualified leads per month through targeted outbound",
+      "Establish thought leadership via LinkedIn content strategy",
+      "Build scalable email infrastructure for long-term growth",
+      "Optimize campaign performance based on data-driven insights"
+    ],
+    "mustInclude": [
+      "specific, measurable outcomes",
+      "client-centric language",
+      "clear value propositions"
+    ],
+    "shouldAvoid": [
+      "vague statements",
+      "internal jargon",
+      "overly technical language",
+      "more than 6 items",
+      "fewer than 3 items"
+    ],
+    "validation": {
+      "arrayLength": {
+        "min": 3,
+        "max": 6
+      },
+      "itemType": "string",
+      "itemMinLength": 20,
+      "itemMaxLength": 150
+    }
+  },
+  "nextSteps": {
+    "required": true,
+    "format": "array of strings",
+    "description": "3-5 action items with optional owner and timeframe",
+    "minItems": 3,
+    "maxItems": 5,
+    "bulletStyle": "action-led, may include (Owner, Timeframe)",
+    "example": [
+      "Review and approve this proposal by March 15",
+      "Schedule kickoff meeting (Client)",
+      "Provide brand assets and messaging docs (Client, Week 1)",
+      "Begin domain and mailbox setup (WarmUp, Week 1)",
+      "Complete onboarding and launch first campaign (WarmUp, Weeks 2-3)"
+    ],
+    "mustInclude": [
+      "clear action verbs",
+      "specific tasks",
+      "optional owner designation",
+      "optional timeframes"
+    ],
+    "shouldAvoid": [
+      "vague instructions",
+      "more than 5 items",
+      "fewer than 3 items",
+      "missing critical steps"
+    ],
+    "validation": {
+      "arrayLength": {
+        "min": 3,
+        "max": 5
+      },
+      "itemType": "string",
+      "itemMinLength": 15,
+      "itemMaxLength": 120
+    }
+  },
+  "proposedProjectPhases": {
+    "required": true,
+    "format": "array of detailed phase objects",
+    "minItems": 2,
+    "maxItems": 3,
+    "structure": {
+      "phase": "string - phase name (e.g., Phase 1: Launch)",
+      "commitment": "string - commitment duration (optional, can be empty)",
+      "window": "string - time window (e.g., Months 1-3)",
+      "focus": "string - focus area description",
+      "bullets": "array of 2-4 activity descriptions",
+      "estimatedHours": {
+        "perMonth": "number - hours per month",
+        "perWeek": "number - hours per week"
+      }
+    },
+    "validation": {
+      "arrayLength": {"min": 2, "max": 3},
+      "phaseRequired": true,
+      "windowRequired": true,
+      "focusRequired": true,
+      "bulletsLength": {"min": 2, "max": 4},
+      "hoursNumeric": true,
+      "perMonthRequired": true,
+      "perWeekRequired": true
+    },
+    "bulletStyle": "detailed, specific activities with outcomes",
+    "mustInclude": [
+      "all required fields per phase",
+      "2-4 bullets per phase",
+      "numeric estimatedHours"
+    ],
+    "shouldAvoid": [
+      "missing required fields",
+      "bullets outside 2-4 range",
+      "non-numeric hours"
+    ],
+    "example": [
+      {
+        "phase": "Phase 1: Launch",
+        "commitment": "3-Month Commitment",
+        "window": "Months 1-3",
+        "focus": "Foundational projects with high ROI and operational efficiency",
+        "bullets": [
+          "Customer Expansion: Identify top expansion opportunities within existing accounts. Enrich contact lists and segment outreach by department and location. Build automated email and task workflows in HubSpot.",
+          "Partner Campaigns: Segment partner accounts by type and value. Create tailored outreach sequences for each segment.",
+          "Lead Scoring: Implement lead scoring workflows in HubSpot. Create task triggers for high-priority leads."
+        ],
+        "estimatedHours": {"perMonth": 40, "perWeek": 10}
+      },
+      {
+        "phase": "Phase 2: Optimization and Scale",
+        "commitment": "",
+        "window": "Months 4-6",
+        "focus": "Expand successful campaigns and add new initiatives",
+        "bullets": [
+          "Inbound Lead Optimization: Connect RB2B.com with Clay and HubSpot. Automate enrichment and task creation for inbound leads.",
+          "Job Change Monitoring: Monitor job changes for key decision-makers; automate personalized outreach on role changes."
+        ],
+        "estimatedHours": {"perMonth": 50, "perWeek": 12}
+      }
+    ]
+  }
+}

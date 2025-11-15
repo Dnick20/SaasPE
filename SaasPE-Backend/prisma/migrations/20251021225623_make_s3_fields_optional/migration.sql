@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Transcription" ALTER COLUMN "s3Key" DROP NOT NULL,
+ALTER COLUMN "s3Bucket" DROP NOT NULL;

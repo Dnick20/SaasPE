@@ -1,0 +1,1942 @@
+// Prisma Schema for SaasPE (Agency Automation Platform)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE TABLES (Multi-Tenant Foundation)
+// ============================================================================
+
+model Tenant {
+  id               String  @id @default(uuid())
+  name             String // Agency name
+  subdomain        String? @unique // Optional custom subdomain (e.g., "acme.saaspe.com")
+  plan             String // "starter" | "professional" | "enterprise"
+  status           String // "active" | "trial" | "suspended" | "cancelled"
+  stripeCustomerId String? @unique
+
+  // Subscription & Billing
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+  billingEmail      String?
+
+  // Usage Tracking
+  usageCredits  Int  @default(0) // Remaining credits for AI operations
+  usedThisMonth Json // { transcriptionMinutes, proposalsGenerated, emailsSent }
+
+  // Settings
+  settings Json // { defaultTemplates, brandColors, emailSignature }
+
+  // Test Account Identification
+  isTestTenant      Boolean   @default(false)
+  testTenantExpiry  DateTime?
+  testTenantPurpose String?   // "smoke_testing" | "integration_testing" | "demo"
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  users          User[]
+  clients        Client[]
+  transcriptions Transcription[]
+  proposals      Proposal[]
+  campaigns      Campaign[]
+  mailboxes      Mailbox[]
+
+  // Subscription & Billing Relationships
+  subscription        TenantSubscription?
+  addOns              TenantAddOn[]
+  usageMetrics        UsageMetric[]
+  upgradeSuggestions  UpgradeSuggestion[]
+  billingEvents       BillingEvent[]
+  paymentMethods      PaymentMethod[]
+  subscriptionHistory SubscriptionHistory[]
+  tokenTransactions   TokenTransaction[]
+
+  // NEW: AI Learning & Email Credits
+  aiGenerationFeedback  AIGenerationFeedback[]
+  proposalLearningLogs  ProposalLearningLog[]  @relation("proposalLearningLogs")
+  emailCredits          TenantEmailCredits?
+  contacts              Contact[]
+  supportConversations  SupportConversation[]
+  bulkImportJobs        BulkImportJob[]
+
+  // NEW: Branding
+  branding TenantBranding?
+  eSignatureConnections ESignatureConnection[]
+  domains Domain[]
+
+  @@index([status])
+  @@index([plan])
+}
+
+model User {
+  id       String @id @default(uuid())
+  tenantId String // Multi-tenant foreign key
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  email        String  @unique
+  passwordHash String? // Null if OAuth-only user
+  firstName    String
+  lastName     String
+  role         String // "admin" | "manager" | "user"
+  status       String  @default("active") // "active" | "invited" | "suspended"
+
+  // OAuth
+  googleId           String? @unique
+  googleAccessToken  String? // For Google Drive API access
+  googleRefreshToken String? // To refresh access token
+  microsoftId        String? @unique
+
+  // Security
+  mfaEnabled Boolean   @default(false)
+  mfaSecret  String?
+  lastLogin  DateTime?
+
+  // Test Account Identification
+  isTestAccount     Boolean   @default(false)
+  testAccountExpiry DateTime?
+  testAccountPurpose String?   // "smoke_testing" | "integration_testing" | "demo"
+
+  // Preferences
+  preferences Json // { notifications, defaultView, timezone }
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  transcriptions Transcription[]
+  proposals      Proposal[]
+  campaigns      Campaign[]
+  auditLogs      AuditLog[]
+  mailboxes      Mailbox[]
+  bulkImportJobs BulkImportJob[]
+
+  // NEW: Support conversations
+  supportConversations SupportConversation[]
+
+  // NEW: Journey & Company Profile
+  journey        UserJourney?
+  companyProfile CompanyProfile?
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+}
+
+// ============================================================================
+// TENANT BRANDING & CUSTOMIZATION
+// ============================================================================
+
+model TenantBranding {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Logo
+  logoS3Key String? // S3 key for uploaded logo
+  logoUrl   String? // Pre-signed or public URL
+
+  // Brand Colors (hex values)
+  primaryColor   String @default("#1E40AF") // Default blue
+  secondaryColor String @default("#F97316") // Default orange
+  accentColor    String?
+
+  // Typography
+  fontFamily  String @default("Inter") // Body font
+  headingFont String @default("Inter") // Heading font
+
+  // Company Information (for PDF cover pages)
+  companyName    String
+  companyAddress String?
+  companyPhone   String?
+  companyEmail   String?
+  companyWebsite String?
+  companyTagline String?
+
+  // PDF Template Preferences
+  footerText String? // Custom footer text for proposals
+  logoPosition String @default("header") // "header" | "cover-only"
+
+  // E-Signature Provider Selection
+  eSignatureProvider String @default("docusign") // "docusign" | "adobe_sign" | "signnow" | "google_workspace"
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// E-SIGNATURE PROVIDER CONNECTIONS
+// ============================================================================
+
+model ESignatureConnection {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Provider type
+  provider String // "docusign" | "adobe_sign" | "signnow" | "google_workspace"
+
+  // OAuth Credentials (encrypted)
+  accessToken  String? // Encrypted access token
+  refreshToken String? // Encrypted refresh token
+  expiresAt    DateTime? // Token expiration
+
+  // Provider-specific IDs
+  accountId String? // Provider account/user ID
+  email     String? // Connected email
+
+  // Connection status
+  isActive Boolean @default(true)
+  lastSynced DateTime @default(now())
+
+  // Metadata
+  scopes String[] // OAuth scopes granted
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@unique([tenantId, provider])
+  @@index([tenantId])
+  @@index([provider])
+}
+
+// ============================================================================
+// CLIENT MANAGEMENT
+// ============================================================================
+
+model Client {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Client Details (extracted from transcripts or manual entry)
+  companyName String
+  industry    String?
+  website     String?
+
+  // Primary Contact
+  contactFirstName String?
+  contactLastName  String?
+  contactEmail     String?
+  contactPhone     String?
+  contactLinkedIn  String?
+
+  // Business Info (from AI extraction)
+  problemStatement String? // What pain point are they solving?
+  currentTools     String[] // Tools they currently use
+  budget           String? // Budget range
+  timeline         String? // Project timeline
+
+  // Enhanced Lead Intake Fields
+  budgetNote            String? // Budget note/context (e.g., "Clay $800/mo + 20 hours")
+  timelineNote          String? // Timeline commitments/checkpoints
+  additionalContacts    Json? // Array of alt_contacts: [{role_or_note, first_name, last_name, email}]
+  deliverablesLogistics String? @db.Text // Who sends what, file formats, etc. (bullet points)
+  keyMeetingsSchedule   String? @db.Text // Recurring checkpoints with day/time (bullet points)
+
+  // CRM Integration
+  hubspotDealId    String? @unique
+  hubspotContactId String? @unique
+  hubspotCompanyId String? @unique
+
+  status String @default("prospect") // "prospect" | "qualified" | "proposal_sent" | "won" | "lost"
+
+  // Journey Tracking (Client-Scoped Journey)
+  journeyStep      String?  // Current journey step for this client
+  journeyCompleted Boolean  @default(false)
+  journeyMetadata  Json? // Journey metadata specific to this client
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  transcriptions Transcription[]
+  proposals      Proposal[]
+  campaigns      Campaign[]
+  playbooks      Playbook[] // Client can have multiple playbooks
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ============================================================================
+// TRANSCRIPTION & AI ANALYSIS
+// ============================================================================
+
+model Transcription {
+  id       String  @id @default(uuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String // User who uploaded
+  user     User    @relation(fields: [userId], references: [id])
+  clientId String? // Optional client association
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  // File Info
+  fileName String
+  fileSize Int // Bytes
+  fileType String // "audio/mpeg" | "video/mp4" | "audio/wav" | "text/plain" | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  s3Key    String? // S3 object key (null for text files)
+  s3Bucket String? // S3 bucket (null for text files)
+  duration Int? // Seconds (set after transcription)
+
+  // Transcription Status
+  status String  @default("uploaded") // "uploaded" | "processing" | "completed" | "failed"
+  jobId  String? // Bull queue job ID
+
+  // Transcription Result (from OpenAI Whisper)
+  transcript String? // Full transcript text
+  confidence Float? // Average confidence score (0-1)
+  language   String? // Detected language
+
+  // AI Analysis Result (from GPT-4)
+  analyzed      Boolean @default(false)
+  extractedData Json? // { problemStatement, budget, timeline, stakeholders, etc. }
+  aiConfidence  Float? // AI extraction confidence (0-1)
+
+  // Learning & Training Data
+  wonBusiness Boolean @default(false) // Did this transcription lead to won business?
+  isExample   Boolean @default(false) // Mark as example for AI learning
+  salesTips   Json? // AI-generated tips for next call: { strengths, improvements, keyMoments }
+
+  // Costs
+  transcriptionCost Float? // OpenAI Whisper cost
+  analysisCost      Float? // GPT-4 analysis cost
+
+  error String? // Error message if failed
+
+  created   DateTime  @default(now())
+  completed DateTime?
+
+  // Relationships
+  proposals Proposal[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+// ============================================================================
+// PROPOSAL GENERATION
+// ============================================================================
+
+model Proposal {
+  id              String         @id @default(uuid())
+  tenantId        String
+  tenant          Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId          String // User who created proposal
+  user            User           @relation(fields: [userId], references: [id])
+  clientId        String
+  client          Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  transcriptionId String? // Source transcription (optional)
+  transcription   Transcription? @relation(fields: [transcriptionId], references: [id], onDelete: SetNull)
+
+  // Proposal Content
+  title  String
+  status String @default("draft") // "draft" | "generating" | "ready" | "sent" | "signed" | "rejected"
+
+  // AI-Generated Sections
+  executiveSummary      String? // High-level overview of proposal
+  objectivesAndOutcomes String? // Clear objectives and expected outcomes
+  scopeOfWork           Json?   // Array of work items: [{ title, objective, keyActivities[], outcome }]
+  deliverables          Json?   // Array of deliverable items with descriptions
+  approachAndTools      String? // Methodology, process, and tools to be used
+  timeline              Json?   // Project timeline (phases and dates)
+  pricing               Json?   // { items: [{name, description, price}], total }
+  paymentTerms          String? // Payment terms and conditions
+  cancellationNotice    String? // Cancellation policy
+
+  // Enhanced Sections (Theme-based Structure)
+  keyPriorities          Json?   // Array of 3-6 priority bullets
+  nextSteps              Json?   // Array of 3-5 action items
+  proposedProjectPhases  Json?   // Array of 2-3 detailed project phases with estimatedHours
+
+  // Enhanced Proposal Sections (Proposal V2)
+  accountHierarchy   Json? // Organizational structure and stakeholder mapping
+  contentEnrichment  Json? // Product libraries and customer segment data
+  kpiForecast        Json? // Projected metrics, KPIs, and expected outcomes
+  teamRoster         Json? // Team composition with bios and roles
+  appendix           Json? // Supporting documents, case studies, references
+
+  // Template & Customization
+  templateId   String? // Reference to proposal template used
+  templateType String  @default("standard") // "standard" | "custom"
+  variables    Json? // Custom variables merged into template
+
+  // Cover Page Data
+  coverPageData Json? // { term, startDate, endDate, preparedBy, etc. }
+
+  // Table of Contents
+  tableOfContents Boolean @default(true)
+
+  // Multiple Pricing Options
+  pricingOptions          Json[] // Array of pricing structures: [{ name, description, items[], total }]
+  selectedPricingOption   String? // Which option client selected (e.g., "A", "B")
+
+  // Feature Toggles for Client View
+  sendOptions Json? // { showTOC, pricingOptions: [0, 1], customSections: [] }
+
+  // Generation Source
+  generationMethod String @default("manual") // "manual" | "transcription" | "hybrid"
+
+  // PDF Export
+  pdfS3Key String? // Generated PDF in S3
+  pdfUrl   String? // Pre-signed URL for download
+
+  // Google Docs Export
+  gdocId  String? // Google Docs file ID
+  gdocUrl String? // Direct link to Google Doc
+
+  // Export Tracking
+  lastExportedAt DateTime? // Timestamp of most recent PDF or GDoc export
+
+  // Two-Stage E-Signature
+  // Agency Signature (Step 1)
+  agencySignedAt     DateTime?
+  agencySignedBy     String? // UserId who signed
+  agencySignatureS3  String? // S3 key for signature image
+
+  // Client Signature (Step 2 - via DocuSign)
+  docusignEnvelopeId String?   @unique
+  pandadocDocumentId String?   @unique
+  clientSignedAt     DateTime? // Renamed from signedAt for clarity
+  signedByName       String? // Client signer name
+  signedByEmail      String? // Client signer email
+
+  // CRM Integration
+  hubspotDealId String? @unique
+
+  // Learning & Training Data
+  wonBusiness Boolean @default(false) // Did this proposal lead to won business?
+  isExample   Boolean @default(false) // Mark as example for AI learning
+
+  // AI Generation Metadata
+  aiModel            String? // "gpt-4-turbo"
+  aiPromptTokens     Int?
+  aiCompletionTokens Int?
+  aiCost             Float?
+
+  // IR v2.0.31: Quality & Confidence Tracking
+  confidenceScores     Json? // Per-section confidence: { executiveSummary: { overall: 0.85, dataAvailability: 0.9, ... }, ... }
+  sourceTracking       Json? // Evidence chains: { claims: [{ text: "...", sources: [{ type, timestamp, quote, confidence }] }] }
+  validationResults    Json? // Quality checks: { contradictions: [], completeness: 0.9, coherence: 0.85, hallucinations: [] }
+  aiGenerationMetadata Json? // Generation tracking: { passes: [{ type, model, timestamp, tokensUsed }], refinements: [], totalPasses: 4 }
+
+  created DateTime  @default(now())
+  updated DateTime  @updatedAt
+  sentAt  DateTime?
+
+  // Relationships
+  kickoffAgenda KickoffAgenda?
+  projectPlan   ProjectPlan?
+  playbooks     Playbook[] // Proposal can have multiple playbooks
+  revisions     ProposalRevision[] // Version history
+
+  // NEW: Narrative Pricing V2 (relational models replacing JSON)
+  pricingOptionsV2 ProposalPricingOption[] @relation("pricingOptionsV2") // Replaces pricingOptions Json[]
+  pricingNotesV2   ProposalPricingNote[]   @relation("pricingNotesV2") // Global pricing notes
+
+  // AI Learning & Improvement
+  learningLogs ProposalLearningLog[] @relation("learningLogs") // Deep analysis logs for failed generation attempts
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([status])
+}
+
+// Proposal Revision History (for undo/audit trail)
+model ProposalRevision {
+  id          String   @id @default(uuid())
+  proposalId  String
+  proposal    Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Snapshot of proposal data at this revision
+  proposalData Json // Complete proposal state
+
+  // Metadata
+  createdBy   String // UserId who made this revision
+  createdAt   DateTime @default(now())
+  changeNote  String? // Optional note about what changed
+
+  @@index([proposalId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// PROPOSAL PRICING V2 (Narrative Pricing aligned with VAF format)
+// ============================================================================
+
+model ProposalPricingOption {
+  id               String   @id @default(uuid())
+  proposalId       String
+  proposal         Proposal @relation("pricingOptionsV2", fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Option Metadata
+  label            String   // "Option A", "Option B", "Premium Package"
+  billingCadence   String   // "fixed_fee" | "monthly_retainer" | "hourly"
+  summary          String   @db.Text // Narrative paragraph explaining the option
+  tierType         String?  // "single" | "tiered" | null
+
+  // Terms & Conditions
+  paymentTerms       String? @db.Text // e.g., "Net 30, ACH preferred"
+  cancellationNotice String? @db.Text // e.g., "30-day notice required"
+
+  // Display Options
+  isRecommended    Boolean  @default(false)
+  sortOrder        Int      @default(0)
+
+  // Relationships
+  lineItems        ProposalPricingLineItem[]
+
+  created          DateTime @default(now())
+  updated          DateTime @updatedAt
+
+  @@index([proposalId])
+  @@index([sortOrder])
+}
+
+model ProposalPricingLineItem {
+  id          String   @id @default(uuid())
+  optionId    String
+  option      ProposalPricingOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+
+  // Line Item Details
+  lineType    String   // "core" | "tier" | "addon" | "thirdParty"
+  description String   @db.Text // Narrative bullet: "Twenty Hour Diagnostic Sprint • Fixed fee..."
+  amount      Float
+  unitType    String   // "fixed" | "hourly" | "monthly"
+
+  // Optional Attributes
+  hoursIncluded    Int?
+  requiresApproval Boolean @default(false)
+  notes            String? @db.Text
+  sortOrder        Int     @default(0)
+
+  created     DateTime @default(now())
+
+  @@index([optionId])
+  @@index([lineType])
+  @@index([sortOrder])
+}
+
+model ProposalPricingNote {
+  id          String   @id @default(uuid())
+  proposalId  String
+  proposal    Proposal @relation("pricingNotesV2", fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Note Details
+  noteType    String   // "payment_method" | "terms" | "cancellation" | "general"
+  content     String   @db.Text
+  sortOrder   Int      @default(0)
+
+  created     DateTime @default(now())
+  updated     DateTime @updatedAt
+
+  @@index([proposalId])
+  @@index([noteType])
+  @@index([sortOrder])
+}
+
+// ============================================================================
+// AI LEARNING & IMPROVEMENT
+// ============================================================================
+
+model ProposalLearningLog {
+  id         String   @id @default(uuid())
+  proposalId String
+  proposal   Proposal @relation("learningLogs", fields: [proposalId], references: [id], onDelete: Cascade)
+  tenantId   String
+  tenant     Tenant   @relation("proposalLearningLogs", fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Failure Context
+  attemptCount      Int      // Which generation attempt this log is for
+  validationErrors  String   @db.Text // JSON string of validation errors
+
+  // Deep Analysis Results
+  rootCause         String   @db.Text // Primary reason for failure
+  missingFields     String[] // Array of missing field names
+  malformedFields   String[] // Array of fields with formatting issues
+  recommendations   String[] // Actionable recommendations
+  promptAdjustments String[] // Suggested prompt modifications
+  confidenceScore   Int      // 0-100 confidence in the analysis
+
+  created DateTime @default(now())
+
+  @@index([proposalId])
+  @@index([tenantId])
+  @@index([attemptCount])
+  @@index([created])
+}
+
+// ============================================================================
+// POST-SIGNATURE DELIVERABLES
+// ============================================================================
+
+model KickoffAgenda {
+  id         String   @id @default(uuid())
+  tenantId   String
+  proposalId String   @unique
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Agenda Content (AI-generated from signed proposal)
+  agendaItems Json // [{title, duration, description, owner}]
+  objectives  String[]
+  attendees   Json? // [{name, role, email}]
+
+  // Calendar Integration
+  googleEventId  String?
+  outlookEventId String?
+  scheduledFor   DateTime?
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ProjectPlan {
+  id         String   @id @default(uuid())
+  tenantId   String
+  proposalId String   @unique
+  proposal   Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // Notion Integration
+  notionPageId String? @unique
+  notionUrl    String?
+
+  // Plan Structure
+  phases     Json // [{name, duration, tasks: [{name, assignee, dueDate}]}]
+  milestones Json // [{name, date, deliverables}]
+
+  status String @default("draft") // "draft" | "synced" | "failed"
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model Playbook {
+  id         String   @id @default(uuid())
+  tenantId   String
+  clientId   String   // Required: Link to specific client
+  client     Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  proposalId String?  // Optional: Can create playbook without proposal
+  proposal   Proposal? @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  // ICP Data (Ideal Customer Profile)
+  targetICP  Json     // { industry, companySize, roles, painPoints, etc. }
+
+  // Script Content (AI-generated)
+  emailScript     Json  // { subject, body, ctaText, ctaUrl, followUpSequence }
+  linkedInScript  Json  // { connectionRequest, firstMessage, followUpMessage }
+  coldCallScript  Json  // { opener, discovery, objectionHandling, close }
+
+  // Guideline Sheet
+  tone        String   // "professional", "friendly", "direct", etc.
+  structure   Json     // Campaign structure, sequence timing
+  ctas        String[] // Call-to-actions
+  compliance  Json?    // Legal/compliance notes, disclaimers
+
+  // Campaign Planning
+  campaignCount    Int  @default(1)
+  campaignStrategy Json // { channels, touchpoints, cadence }
+
+  // Export & Sharing
+  googleDocUrl String?  // Google Doc export URL
+  pdfS3Key     String?  // S3 key for PDF export
+  pdfUrl       String?  // Public/signed URL for PDF
+
+  // Versioning & Template Management
+  version    Int     @default(1) // Track playbook versions
+  isTemplate Boolean @default(false) // Mark reusable playbooks
+  createdBy  String  // User ID who created the playbook
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([isTemplate])
+}
+
+// ============================================================================
+// BUYER PERSONA & ICP BUILDER
+// ============================================================================
+
+model BuyerPersona {
+  id         String  @id @default(uuid())
+  tenantId   String
+  proposalId String? // Optional association with proposal
+
+  // Persona Details
+  name        String // e.g., "Enterprise IT Director"
+  jobTitle    String
+  industry    String
+  companySize String // "1-50", "51-200", etc.
+
+  // Demographics
+  demographics Json // { ageRange, location, education }
+
+  // Psychographics
+  goals       String[]
+  painPoints  String[]
+  motivations String[]
+  objections  String[]
+
+  // Behavioral
+  informationSources String[] // Where they research solutions
+  decisionCriteria   String[] // What influences their buying decision
+
+  // Contact Enrichment (LinkedIn data)
+  linkedinProfile String?
+  currentCompany  String?
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// ============================================================================
+// CAMPAIGN MANAGEMENT & EMAIL OUTREACH
+// ============================================================================
+
+model Domain {
+  id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name            String  // Domain name, e.g., "example.com"
+  registrar       String  // "namecheap" | "porkbun" | "other"
+  status          String  // "purchased" | "dns_configured" | "verified"
+  spfConfigured   Boolean @default(false)
+  dkimConfigured  Boolean @default(false)
+  dmarcConfigured Boolean @default(false)
+  returnPathCname String?
+  trackingCname   String?
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  mailboxes Mailbox[]
+
+  @@index([tenantId])
+  @@unique([tenantId, name])
+}
+
+model Mailbox {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String // User who created the mailbox
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email    String
+  type     MailboxType // user_provided | managed
+  provider MailboxProvider // gmail | outlook | smtp | aws_ses
+  status   MailboxStatus @default(INACTIVE) // active | warming | suspended | inactive
+
+  // Ownership
+  domainId String?
+  domain   Domain? @relation(fields: [domainId], references: [id])
+
+  // OAuth Configuration (Gmail/Outlook)
+  oauthProvider     String? // "google" | "microsoft"
+  oauthRefreshToken String? // Encrypted refresh token
+  oauthAccessToken  String? // Encrypted access token
+  oauthTokenExpiry  DateTime?
+  oauthScopes       String[] @default([])
+
+  // SMTP Configuration
+  smtpHost     String?
+  smtpPort     Int?
+  smtpUsername String?
+  smtpPassword String? // Encrypted
+  smtpUseSsl   Boolean? @default(true)
+
+  // AWS SES Configuration
+  awsSesIdentity String? // Verified SES identity
+  awsSesRegion   String?
+  dedicatedIp    String?
+
+  // Tracking & Deliverability
+  trackingDomain   String?
+  useOpenTracking  Boolean  @default(true)
+  useClickTracking Boolean  @default(true)
+
+  // Warmup Configuration
+  warmupStatus       WarmupStatus @default(IDLE) // idle | warming | active | paused
+  warmupStartDate    DateTime?
+  warmupDaysActive   Int          @default(0)
+  warmupCurrentLimit Int          @default(10)
+  warmupTargetLimit  Int          @default(100)
+  rampStage          String?
+
+  // Legacy warmup fields (keeping for backward compatibility)
+  warmupEnabled       Boolean  @default(true)
+  warmupStartedAt     DateTime?
+  warmupDaysRemaining Int      @default(14)
+  dailySendLimit      Int      @default(10)
+  hourlyLimit         Int?
+  lastWarmupEmailSent DateTime?
+  warmupEmailsSentToday Int    @default(0)
+
+  // Health Metrics
+  healthScore     Float    @default(100)
+  bounceRate      Float    @default(0)
+  complaintRate   Float    @default(0)
+  lastHealthCheck DateTime?
+  complaints30d   Int      @default(0)
+  bounces30d      Int      @default(0)
+
+  // Metadata
+  created  DateTime  @default(now())
+  updated  DateTime  @updatedAt
+  lastUsed DateTime?
+
+  // Scheduling Preferences
+  timezone  String?
+  quietHours Json?
+
+  // Relationships
+  campaigns      Campaign[]
+  emailsSent     CampaignEmail[]
+  bulkImportJobs BulkImportJob[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@index([userId])
+  @@index([domainId])
+  @@map("mailboxes")
+}
+
+enum MailboxType {
+  USER_PROVIDED // User's own email account (OAuth or SMTP)
+  MANAGED       // SaasPE-managed account (AWS SES)
+}
+
+enum MailboxProvider {
+  GMAIL
+  OUTLOOK
+  SMTP
+  AWS_SES
+}
+
+enum MailboxStatus {
+  ACTIVE    // Ready to send emails
+  WARMING   // In warmup process
+  SUSPENDED // Temporarily disabled (high bounce/complaint rate)
+  INACTIVE  // Not configured or disabled by user
+}
+
+enum WarmupStatus {
+  IDLE    // Not started
+  WARMING // In progress
+  ACTIVE  // Completed
+  PAUSED  // Temporarily paused
+}
+
+model BulkImportJob {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Job Details
+  status         ImportJobStatus @default(PENDING)
+  fileType       String // 'csv' | 'xlsx' | 'numbers' | 'google_sheets'
+  fileName       String
+  totalRows      Int
+  processedRows  Int             @default(0)
+  successfulRows Int             @default(0)
+  failedRows     Int             @default(0)
+
+  // Error Tracking
+  errors       Json? // Array of { row: number, message: string }
+  errorFileUrl String? // S3 URL to downloadable error CSV
+
+  // Metadata
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  created     DateTime  @default(now())
+  updated     DateTime  @updatedAt
+
+  // Relationships
+  mailboxId String?
+  mailbox   Mailbox? @relation(fields: [mailboxId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([userId])
+  @@map("bulk_import_jobs")
+}
+
+enum ImportJobStatus {
+  PENDING    // Job queued
+  PROCESSING // Currently processing
+  COMPLETED  // Finished successfully
+  FAILED     // Failed with errors
+  CANCELLED  // Cancelled by user
+}
+
+model Campaign {
+  id        String  @id @default(uuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId    String // Campaign creator
+  user      User    @relation(fields: [userId], references: [id])
+  clientId  String? // Optional client association
+  client    Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  mailboxId String
+  mailbox   Mailbox @relation(fields: [mailboxId], references: [id])
+
+  name   String
+  status String @default("draft") // "draft" | "scheduled" | "running" | "paused" | "completed"
+
+  // Campaign Settings
+  sequence Json // [{step, subject, body, delayDays, aiPersonalization}]
+  schedule Json // { sendDays: ["Mon", "Tue"], sendTimeStart: "09:00", sendTimeEnd: "17:00", timezone: "America/New_York" }
+
+  // Target List
+  contacts      Json // [{email, firstName, lastName, company, linkedinUrl, customFields}]
+  totalContacts Int  @default(0)
+
+  // Tracking
+  sentCount         Int @default(0)
+  openedCount       Int @default(0)
+  clickedCount      Int @default(0)
+  repliedCount      Int @default(0)
+  bouncedCount      Int @default(0)
+  unsubscribedCount Int @default(0)
+
+  // Compliance
+  includeDnc         Boolean @default(true) // Check Do-Not-Contact list
+  includeUnsubscribe Boolean @default(true)
+
+  started   DateTime?
+  completed DateTime?
+  created   DateTime  @default(now())
+  updated   DateTime  @updatedAt
+
+  // Relationships
+  emails CampaignEmail[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model CampaignEmail {
+  id         String   @id @default(uuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  mailboxId  String?
+  mailbox    Mailbox? @relation(fields: [mailboxId], references: [id])
+
+  // Recipient
+  recipientEmail String
+  recipientName  String?
+
+  // Email Content
+  sequenceStep Int // Which step in the sequence (1, 2, 3...)
+  subject      String
+  body         String // HTML email body
+
+  // Send Status
+  status String @default("pending") // "pending" | "sent" | "delivered" | "opened" | "clicked" | "replied" | "bounced" | "failed"
+
+  // AWS SES Tracking
+  sesMessageId String? @unique
+
+  // Engagement
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  openedAt    DateTime?
+  clickedAt   DateTime?
+  repliedAt   DateTime?
+  bouncedAt   DateTime?
+
+  // Reply Handling
+  replyBody           String? // Reply content if user responded
+  replyClassification String? // "interested" | "not_interested" | "out_of_office" | "unsubscribe"
+
+  error String?
+
+  created   DateTime @default(now())
+  Contact   Contact? @relation(fields: [contactId], references: [id])
+  contactId String?
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([recipientEmail])
+}
+
+// ============================================================================
+// COMPLIANCE & AUDIT LOGGING
+// ============================================================================
+
+model DoNotContact {
+  id       String @id @default(uuid())
+  tenantId String
+
+  email  String
+  reason String? // "unsubscribe" | "bounce" | "complaint" | "manual"
+  source String? // Which campaign or source triggered DNC
+
+  created DateTime @default(now())
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Suppression {
+  id       String @id @default(uuid())
+  tenantId String
+
+  email String
+  type  String // "unsubscribe" | "bounce" | "complaint" | "manual"
+  source String?
+  reason String?
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, email])
+  @@index([tenantId, type])
+}
+
+model AuditLog {
+  id       String  @id @default(uuid())
+  tenantId String
+  userId   String? // Null for system actions
+  user     User?   @relation(fields: [userId], references: [id])
+
+  action     String // "user.login", "proposal.sent", "campaign.started", etc.
+  resource   String // "Proposal", "Campaign", "User"
+  resourceId String? // ID of affected resource
+
+  metadata  Json? // Additional context
+  ipAddress String?
+  userAgent String?
+
+  timestamp DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model ErrorLog {
+  id       String  @id @default(uuid())
+  tenantId String
+  userId   String? // User who experienced the error (null for anonymous/system errors)
+
+  // Error Identification
+  errorId    String  @unique // Unique error fingerprint (from Sentry or generated)
+  sentryId   String? // Sentry event ID for deep linking
+  severity   String // "CRITICAL" | "HIGH" | "MEDIUM" | "LOW" | "INFO"
+  category   String? // "authentication", "api", "database", "ui", "external_service"
+  source     String // "frontend" | "backend"
+
+  // Error Details
+  message    String  @db.Text
+  stackTrace String? @db.Text
+  errorType  String? // Error class name (e.g., "TypeError", "ValidationError")
+
+  // Context & Metadata
+  context     Json? // Full error context (app state, API history, navigation, device info)
+  endpoint    String? // API endpoint where error occurred
+  method      String? // HTTP method (GET, POST, etc.)
+  statusCode  Int? // HTTP status code
+
+  // Request Information
+  ipAddress String?
+  userAgent String?
+
+  // User Impact
+  userEmail      String? // For easier filtering
+  affectedUsers  Int     @default(1) // Count of users affected by same error
+  occurrenceCount Int    @default(1) // How many times this error occurred
+
+  // Resolution Tracking
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime?
+  resolvedBy String? // Admin user ID who resolved
+  resolution String? // Notes on how it was resolved
+
+  // Notification Tracking
+  notificationSent Boolean   @default(false)
+  notifiedAt       DateTime?
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([severity])
+  @@index([source])
+  @@index([resolved])
+  @@index([created])
+  @@index([tenantId, resolved, severity]) // For admin dashboard queries
+}
+
+// ============================================================================
+// BILLING & USAGE TRACKING
+// ============================================================================
+
+model Invoice {
+  id       String @id @default(uuid())
+  tenantId String
+
+  stripeInvoiceId String @unique
+  amount          Float // Total amount in dollars
+  currency        String @default("usd")
+  status          String // "draft" | "open" | "paid" | "uncollectible"
+
+  // Line Items
+  lineItems Json // [{ description, quantity, unitPrice, amount }]
+
+  // Dates
+  periodStart DateTime
+  periodEnd   DateTime
+  dueDate     DateTime
+  paidAt      DateTime?
+
+  created DateTime @default(now())
+
+  // Relationships
+  billingEvents BillingEvent[]
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+// ============================================================================
+// SUBSCRIPTION & BILLING SYSTEM
+// ============================================================================
+
+model SubscriptionPlan {
+  id String @id @default(uuid())
+
+  // Plan Details
+  name        String @unique // "starter" | "growth" | "professional" | "enterprise"
+  displayName String // "Starter", "Growth ⭐", "Professional", "Enterprise"
+  description String // Short description
+
+  // Token-Based Pricing Model
+  monthlyPrice  Float // $79, $199, $399, $799
+  annualPrice   Float // With discount applied
+  monthlyTokens Int // Tokens included per month: 10000, 30000, 75000, 200000
+  annualTokens  Int // Bonus tokens for annual: 12000, 35000, 90000, 240000 per month
+  currency      String @default("usd")
+
+  // Token Overage Pricing
+  overageTokenCost Float // $0.009, $0.008, $0.007, $0.006 per token
+
+  // Stripe Integration
+  stripeMonthlyPriceId String? @unique // Stripe monthly price ID
+  stripeAnnualPriceId  String? @unique // Stripe annual price ID
+
+  // Feature Limits & Access
+  features Json // { crm, basicAnalytics, hubspotIntegration, apiAccess, whiteLabel, etc. }
+
+  // NEW: instantly.ai-style features
+  monthlyEmailCredits Int     @default(0) // 5K/100K/500K
+  contactLimit        Int     @default(0) // 1K/25K/100K
+  unlimitedMailboxes  Boolean @default(false)
+  unlimitedWarmup     Boolean @default(false)
+  supportLevel        String  @default("chatbot") // chatbot, priority, dedicated
+
+  // Plan Metadata
+  isActive        Boolean @default(true)
+  sortOrder       Int // Display order (1, 2, 3, 4)
+  isMostPopular   Boolean @default(false)
+  isCustomPricing Boolean @default(false)
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  subscriptions TenantSubscription[]
+  historyFrom   SubscriptionHistory[] @relation("from_plan")
+  historyTo     SubscriptionHistory[] @relation("to_plan")
+
+  @@index([isActive])
+  @@index([sortOrder])
+}
+
+model AddOn {
+  id String @id @default(uuid())
+
+  // Add-On Details
+  code        String @unique // "ai_power_pack", "email_amplifier", etc.
+  name        String // "AI Power Pack"
+  description String // Full description
+
+  // Pricing
+  monthlyPrice Float // $49, $39, $79, $29, $149
+  currency     String @default("usd")
+
+  // Stripe Integration
+  stripePriceId String? @unique
+
+  // Benefits
+  benefits Json // { additionalTranscriptions, additionalProposals, additionalEmails, features[] }
+
+  // Metadata
+  isActive  Boolean @default(true)
+  sortOrder Int
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  tenantAddOns TenantAddOn[]
+
+  @@index([isActive])
+  @@index([code])
+}
+
+model TenantSubscription {
+  id       String @id @default(uuid())
+  tenantId String @unique // One active subscription per tenant
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
+
+  // Subscription Details
+  status          String // "active" | "trial" | "past_due" | "canceled" | "paused"
+  billingInterval String // "monthly" | "annual"
+
+  // Token Balance & Allocation
+  tokenBalance         Int // Current available tokens
+  monthlyAllocation    Int // Tokens allocated per month from plan
+  tokensUsedThisPeriod Int @default(0) // Tracking for analytics
+  lifetimeTokensUsed   Int @default(0) // Total historical usage
+
+  // Pricing
+  monthlyPrice     Float // Locked price (may differ if grandfathered)
+  currency         String @default("usd")
+  overageTokenCost Float // Cost per overage token
+
+  // Stripe Integration
+  stripeSubscriptionId String? @unique
+  stripeCustomerId     String?
+
+  // Trial
+  isTrialing  Boolean   @default(false)
+  trialEndsAt DateTime?
+
+  // Billing Dates
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean   @default(false)
+  canceledAt         DateTime?
+
+  // Previous Plan (for upgrades/downgrades)
+  previousPlanId       String?
+  previousTokenBalance Int? // Track balance when upgrading
+  upgradedAt           DateTime?
+  downgradedAt         DateTime?
+
+  // Auto-Refill Settings
+  autoRefillEnabled   Boolean @default(false)
+  autoRefillThreshold Int? // Trigger refill when balance drops below
+  autoRefillAmount    Int? // How many tokens to purchase
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  tokenTransactions TokenTransaction[]
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+}
+
+model TenantAddOn {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  addOnId String
+  addOn   AddOn  @relation(fields: [addOnId], references: [id])
+
+  // Add-On Details
+  status   String // "active" | "canceled"
+  quantity Int    @default(1) // For Team Expansion Pack (per seat)
+
+  // Stripe Integration
+  stripeSubscriptionItemId String? @unique
+
+  // Pricing
+  currentPrice Float
+  currency     String @default("usd")
+
+  // Billing Dates
+  activatedAt       DateTime  @default(now())
+  cancelAtPeriodEnd Boolean   @default(false)
+  canceledAt        DateTime?
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@unique([tenantId, addOnId]) // Each add-on can only be purchased once per tenant
+  @@index([tenantId])
+  @@index([addOnId])
+  @@index([status])
+}
+
+model UsageMetric {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Time Period
+  date  DateTime @db.Date // Daily tracking
+  month String // "2025-10" for monthly aggregation
+
+  // Usage Counts
+  transcriptionsUsed Int    @default(0)
+  proposalsGenerated Int    @default(0)
+  emailsSent         Int    @default(0)
+  apiRequestsMade    Int    @default(0)
+  storageUsedBytes   BigInt @default(0)
+  activeUsers        Int    @default(0) // Unique users who logged in this day
+
+  // Limits Hit
+  transcriptionLimitHit Boolean @default(false)
+  proposalLimitHit      Boolean @default(false)
+  emailLimitHit         Boolean @default(false)
+
+  // Costs
+  openaiCost Float @default(0)
+  awsCost    Float @default(0)
+
+  created DateTime @default(now())
+
+  @@unique([tenantId, date])
+  @@index([tenantId, month])
+  @@index([date])
+}
+
+model UpgradeSuggestion {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Suggestion Details
+  type             String // "plan_upgrade" | "add_on" | "team_expansion"
+  suggestedPlanId  String? // If plan upgrade
+  suggestedAddOnId String? // If add-on suggestion
+
+  // Trigger
+  triggerReason String // "transcription_limit_80_percent", "email_limit_reached", etc.
+  triggerData   Json // { currentUsage: 450, limit: 500, percentage: 90 }
+
+  // Marketing Copy
+  title       String // "Unlock 4x More Proposals for $49"
+  description String // Personalized message
+  ctaText     String // "Upgrade Now"
+
+  // ROI Calculation
+  estimatedTimeSaved  Int? // Hours per month
+  estimatedValueSaved Float? // Dollar value
+  roiMultiplier       Float? // 40x, 64x, etc.
+
+  // Status
+  status String @default("pending") // "pending" | "viewed" | "dismissed" | "accepted"
+
+  viewedAt    DateTime?
+  dismissedAt DateTime?
+  acceptedAt  DateTime?
+
+  // Attribution (if they upgrade)
+  resultedInUpgrade Boolean @default(false)
+  upgradeRevenue    Float?
+
+  created   DateTime @default(now())
+  expiresAt DateTime // Suggestions expire after 30 days
+
+  @@index([tenantId, status])
+  @@index([status, expiresAt])
+}
+
+model BillingEvent {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Event Details
+  type   String // "charge" | "refund" | "credit" | "discount" | "trial_start" | "trial_end"
+  status String // "succeeded" | "failed" | "pending"
+
+  // Amount
+  amount   Float
+  currency String @default("usd")
+
+  // Description
+  description String // "Monthly subscription - Growth Plan"
+  metadata    Json? // Additional data
+
+  // Stripe Integration
+  stripeEventId  String? @unique
+  stripeChargeId String?
+
+  // Related Records
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([type])
+  @@index([created])
+}
+
+// ============================================================================
+// TOKEN TRACKING SYSTEM
+// ============================================================================
+
+model TokenTransaction {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  subscriptionId String
+  subscription   TenantSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // Transaction Details
+  type String // "consume" | "refill" | "allocation" | "refund" | "bonus"
+
+  // Token Amount
+  tokens Int // Positive for additions, negative for consumption
+
+  // Balance Tracking
+  balanceBefore Int
+  balanceAfter  Int
+
+  // Action Details (for consumption)
+  actionType String? // "transcription_upload" | "proposal_generation" | "email_send" | etc.
+  actionId   String? // ID of the related record (transcriptionId, proposalId, etc.)
+
+  // Pricing (for consumption)
+  pricingId    String?
+  tokenPricing TokenPricing? @relation(fields: [pricingId], references: [id])
+
+  // Metadata
+  description String // Human-readable description
+  metadata    Json? // Additional context
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([subscriptionId])
+  @@index([type])
+  @@index([actionType])
+  @@index([created])
+}
+
+model TokenPricing {
+  id String @id @default(uuid())
+
+  // Action Identification
+  actionType  String @unique // "transcription_upload_30min" | "proposal_generation" | etc.
+  category    String // "transcription" | "proposal" | "email" | "crm" | "export"
+  displayName String // "Upload & transcribe meeting (30 min)"
+
+  // Token Cost
+  tokenCost Int // Number of tokens consumed
+
+  // Cost Breakdown (for transparency)
+  infrastructureCost Float? // AWS/database cost in dollars
+  aiCost             Float? // OpenAI API cost in dollars
+  valueScore         Int? // 1-10 business value rating
+
+  // Multipliers for Premium Features
+  gpt4Multiplier     Float @default(2.0) // 2x cost for GPT-4
+  priorityMultiplier Float @default(1.5) // 1.5x for priority queue
+  advancedMultiplier Float @default(3.0) // 3x for advanced features
+
+  // Metadata
+  description String // Detailed explanation
+  isActive    Boolean @default(true)
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  // Relationships
+  transactions TokenTransaction[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
+model PaymentMethod {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Stripe Integration
+  stripePaymentMethodId String @unique
+
+  // Card Details (last 4, brand, expiry)
+  type         String // "card" | "bank_account"
+  cardBrand    String? // "visa", "mastercard", "amex"
+  cardLast4    String?
+  cardExpMonth Int?
+  cardExpYear  Int?
+
+  // Bank Details
+  bankName  String?
+  bankLast4 String?
+
+  // Status
+  isDefault Boolean @default(false)
+  status    String // "active" | "expired" | "invalid"
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([stripePaymentMethodId])
+}
+
+model SubscriptionHistory {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Change Details
+  action     String // "upgrade" | "downgrade" | "cancel" | "reactivate" | "trial_convert"
+  fromPlanId String?
+  toPlanId   String?
+  fromPlan   SubscriptionPlan? @relation("from_plan", fields: [fromPlanId], references: [id])
+  toPlan     SubscriptionPlan? @relation("to_plan", fields: [toPlanId], references: [id])
+
+  // Pricing Change
+  fromPrice Float?
+  toPrice   Float?
+  mrrChange Float // Monthly recurring revenue change
+
+  // Reason & Attribution
+  reason              String? // "usage_limit", "cost_savings", "features_needed"
+  upgradeSuggestionId String? // If triggered by upgrade suggestion
+
+  // Metadata
+  metadata Json?
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([action])
+  @@index([created])
+}
+
+// ============================================================================
+// AI LEARNING & FEEDBACK SYSTEM
+// ============================================================================
+
+model AIGenerationFeedback {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String? // User who provided feedback
+
+  // What was generated
+  generationType  String // "proposal", "email", "summary", "key_moments"
+  generationId    String // ID of the proposal/email/etc.
+  promptUsed      String @db.Text
+  outputGenerated String @db.Text
+  modelUsed       String // "gpt-4-turbo-preview", "gpt-3.5-turbo"
+
+  // Feedback
+  userRating    Int? // 1-5 stars
+  wasEdited     Boolean @default(false)
+  editedVersion String? @db.Text // If user edited the output
+  feedback      String? @db.Text // User comments
+  outcome       String? // "won_deal", "lost_deal", "no_response", "unclear"
+
+  // Enhanced Feedback (Personalized Learning V2)
+  detailedRatings      Json? // Multi-dimensional: { accuracy, tone, length, specificity, persuasiveness, structure }
+  categoricalFeedback  String[] @default([]) // Quick tags: ["too_generic", "wrong_tone", "missing_details"]
+  editPatterns         Json? // Extracted patterns: [{ type, category, examples, impact }]
+  feedbackWeight       Float? // Quality-based weight (0-5.0)
+  validationScore      Float? // Feedback validation confidence (0-1)
+  validationWarnings   String[] @default([]) // ["high_rating_but_heavy_edits"]
+
+  // Context for learning
+  inputContext Json // Transcript data, client info, etc.
+  wonDeal      Boolean? // Did this lead to a won deal?
+  dealValue    Float? // If won, what was the value?
+
+  // Meta
+  created DateTime @default(now())
+
+  @@index([tenantId, generationType])
+  @@index([outcome])
+  @@index([wonDeal])
+  @@index([userId])
+}
+
+model AIAuditLog {
+  id         String   @id @default(uuid())
+  userId     String
+  operation  String   // 'proposal_generation', 'website_analysis', 'transcription', etc.
+  prompt     String   @db.Text
+  response   String?  @db.Text
+  error      String?  @db.Text
+  tokensUsed Int?
+  created    DateTime @default(now())
+
+  @@index([userId])
+  @@index([operation])
+  @@map("ai_audit_logs")
+}
+
+model AIErrorPattern {
+  id String @id @default(uuid())
+
+  errorType       String // "hallucination", "tone_mismatch", "missing_info", "formatting"
+  description     String @db.Text
+  examplePrompt   String @db.Text
+  correctOutput   String @db.Text
+  incorrectOutput String @db.Text
+
+  // How often this error occurs
+  occurrences Int      @default(1)
+  lastSeen    DateTime @default(now())
+
+  // Solution
+  fixInstructions String @db.Text
+  preventionTip   String @db.Text
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([errorType])
+}
+
+// ============================================================================
+// PERSONALIZED AI LEARNING SYSTEM
+// ============================================================================
+
+model UserLearningPreferences {
+  id       String @id @default(uuid())
+  userId   String @unique
+  tenantId String
+
+  // Learned Preferences (from feedback & edit patterns)
+  preferredTone   String? // "professional" | "casual" | "consultative" | "friendly"
+  preferredLength String? // "concise" | "detailed" | "comprehensive"
+
+  // Edit Patterns (aggregated from ProposalEditTracking)
+  topEditPatterns   Json? // Top 10 most frequent patterns: [{ type, category, frequency, examples }]
+  commonStrengths   Json? // Sections consistently rated high or left unedited
+  commonWeaknesses  Json? // Sections needing improvement
+  avoidPatterns     String[] @default([]) // Things user consistently removes
+  emphasizePatterns String[] @default([]) // Things user consistently adds
+
+  // Industry-Specific Preferences
+  industryPreferences Json? // Grouped by industry: { "SaaS": { tone, patterns }, "Healthcare": {...} }
+
+  // Metadata
+  sampleSize      Int   @default(0) // Number of feedback items used
+  confidenceScore Float @default(0.0) // How confident we are in the profile (0-1)
+  lastUpdated     DateTime @updatedAt
+
+  // Privacy Controls
+  enablePersonalization Boolean @default(true)
+  shareForGlobalLearning Boolean @default(false) // Opt-in for anonymized aggregation
+
+  // Timestamps
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([confidenceScore])
+}
+
+model ProposalEditTracking {
+  id          String @id @default(uuid())
+  proposalId  String
+  userId      String
+  tenantId    String
+  section     String // "executiveSummary", "scopeOfWork", "pricing", etc.
+
+  // Edit Details
+  originalText String @db.Text
+  editedText   String @db.Text
+  editType     String // "addition" | "deletion" | "tone_shift" | "length_change" | "replacement"
+  editCategory String? // "adds_metrics" | "removes_jargon" | "more_formal" | "more_specific"
+
+  // Edit Magnitude
+  editDistance Int? // Levenshtein distance
+  editMagnitude Float? // Percentage of content changed (0-1)
+
+  // AI Analysis (optional - can be computed async)
+  aiAnalysis Json? // { reason: "...", pattern: "...", recommendation: "..." }
+
+  // Context
+  clientIndustry String?
+  proposalType   String? // "new_business" | "renewal" | "expansion"
+
+  // Metadata
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([proposalId])
+  @@index([section])
+  @@index([editCategory])
+}
+
+// ============================================================================
+// AI COST TRACKING (Phase 2 Multi-Pass Enhancement)
+// ============================================================================
+
+model AICostLog {
+  id         String   @id @default(uuid())
+  proposalId String
+  tenantId   String
+  phase      Int // 1 or 2 (Phase 1 vs Phase 2 multi-pass)
+  model      String // "gpt-4o-mini" | "gpt-4o" | "gpt-4-turbo"
+  operation  String // "entity_extraction" | "section_drafting" | "gap_filling" | "proposal_generation"
+
+  // Token Usage
+  promptTokens     Int
+  completionTokens Int
+  totalTokens      Int
+
+  // Cost
+  cost Float // USD
+
+  // Metadata
+  metadata  Json? // Additional context: { confidence, duration, passNumber, etc. }
+  timestamp DateTime @default(now())
+
+  @@index([tenantId, timestamp])
+  @@index([proposalId])
+  @@index([phase])
+  @@index([tenantId, phase, timestamp]) // For cost analysis queries
+}
+
+// ============================================================================
+// EMAIL CREDITS SYSTEM
+// ============================================================================
+
+model TenantEmailCredits {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  monthlyAllocation Int // 5K/100K/500K based on plan
+  creditsUsed       Int @default(0)
+
+  // Overage tracking
+  overageCreditsUsed Int   @default(0)
+  overageRate        Float @default(0.001) // $0.001 per email
+
+  // Billing period
+  currentPeriodStart DateTime @default(now())
+  currentPeriodEnd   DateTime
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  transactions EmailCreditTransaction[]
+
+  @@index([tenantId])
+}
+
+model EmailCreditTransaction {
+  id           String             @id @default(uuid())
+  tenantId     String
+  creditsId    String
+  emailCredits TenantEmailCredits @relation(fields: [creditsId], references: [id], onDelete: Cascade)
+
+  type          String // "consume", "refill", "allocation", "bonus"
+  credits       Int // Positive for add, negative for consume
+  balanceBefore Int
+  balanceAfter  Int
+
+  // Context
+  actionType  String? // "campaign_email", "bulk_send", "individual_send"
+  campaignId  String?
+  description String
+  metadata    Json?
+
+  created DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([creditsId])
+}
+
+// ============================================================================
+// CONTACT MANAGEMENT
+// ============================================================================
+
+model Contact {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Primary fields
+  email     String // Primary deduplication key
+  firstName String?
+  lastName  String?
+  company   String?
+  jobTitle  String?
+  phone     String?
+
+  // Additional fields
+  linkedinUrl String?
+  website     String?
+  city        String?
+  state       String?
+  country     String?
+
+  // Custom fields (flexible)
+  customFields Json? // { "industry": "Tech", "leadScore": 85 }
+  tags         String[] // ["hot-lead", "decision-maker"]
+
+  // Metadata
+  source        String? // "import", "hubspot_sync", "manual", "api"
+  status        String    @default("active") // active, bounced, unsubscribed
+  lastContacted DateTime?
+
+  // Relationships
+  campaignEmails CampaignEmail[]
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@unique([tenantId, email]) // Prevent duplicate emails per tenant
+  @@index([tenantId])
+  @@index([email])
+  @@index([status])
+}
+
+// ============================================================================
+// AI SUPPORT SYSTEM
+// ============================================================================
+
+model SupportConversation {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+
+  status   String  @default("open") // open, escalated, resolved, closed
+  category String? // "billing", "technical", "feature_request", "other"
+  priority String  @default("normal") // low, normal, high, urgent
+
+  // Escalation
+  escalatedToHuman Boolean   @default(false)
+  escalatedAt      DateTime?
+  assignedTo       String? // Admin user ID
+
+  // Satisfaction
+  satisfactionRating Int? // 1-5
+  feedback           String?
+
+  messages SupportMessage[]
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([escalatedToHuman])
+}
+
+model SupportMessage {
+  id             String              @id @default(uuid())
+  conversationId String
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role    String // "user", "ai", "admin"
+  content String @db.Text
+
+  // AI-specific
+  aiModel         String? // "gpt-4", "gpt-3.5-turbo"
+  confidenceScore Float? // 0-1
+
+  created DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+// ============================================================================
+// CUSTOMER JOURNEY & ONBOARDING SYSTEM
+// ============================================================================
+
+model UserJourney {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Journey Progress
+  currentStep    String   @default("discovery") // discovery, client, proposal, mailboxes, warmup, campaign, complete
+  completedSteps String[] @default([]) // Array of completed step names
+  skippedSteps   String[] @default([]) // Steps the user chose to skip
+
+  // Journey Metadata
+  metadata Json // Store all journey-related IDs and preferences
+
+  // Tracking
+  lastActiveAt DateTime @updatedAt
+  startedAt    DateTime @default(now())
+  completedAt  DateTime? // When journey reached 'complete' step
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([userId])
+  @@index([currentStep])
+}
+
+model CompanyProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic Information
+  companyName String
+  website     String?
+  industry    String?
+
+  // ICP & Preferences
+  targetICP     String? @db.Text // Ideal Customer Profile description
+  preferredTone String? // "professional", "friendly", "consultative", "casual"
+
+  // Products & Services
+  productsSold    String[] @default([]) // Top 5 products the company sells
+  productsNotSold String[] @default([]) // 2-3 products the company does NOT sell
+  servicesSold    String[] @default([]) // Top 5 services the company offers
+
+  // Enrichment Data
+  enrichmentData Json? // Data scraped from website
+  scraped        Boolean  @default(false)
+  scrapedAt      DateTime?
+
+  // Default Settings
+  defaultSettings Json? // Campaign defaults, proposal templates
+
+  created DateTime @default(now())
+  updated DateTime @updatedAt
+
+  @@index([userId])
+}

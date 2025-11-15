@@ -4,9 +4,9 @@ services:
   postgres:
     image: postgres:15-alpine
     environment:
-      - POSTGRES_USER=saaspe
-      - POSTGRES_PASSWORD=saaspe_prod_2025
-      - POSTGRES_DB=saaspe_production
+      - POSTGRES_USER=${PRODUCTION_DB_USER:-saaspe}
+      - POSTGRES_PASSWORD=${PRODUCTION_DB_PASSWORD}
+      - POSTGRES_DB=${PRODUCTION_DB_NAME:-saaspe_production}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
@@ -38,9 +38,12 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=staging
-      - DATABASE_URL=postgresql://saaspe:saaspe_prod_2025@postgres:5432/saaspe_production?schema=public
+      - NODE_ENV=production
+      - DATABASE_URL=${PRODUCTION_DATABASE_URL}
       - REDIS_URL=redis://redis:6379
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${PRODUCTION_REDIS_PASSWORD:-}
       - JWT_SECRET=${PRODUCTION_JWT_SECRET}
       - AWS_ACCESS_KEY_ID=${PRODUCTION_AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${PRODUCTION_AWS_SECRET_ACCESS_KEY}
@@ -48,9 +51,12 @@ services:
       - AWS_S3_BUCKET=${AWS_S3_BUCKET}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SENTRY_DSN=${SENTRY_DSN}
-      - SENTRY_ENVIRONMENT=staging
+      - SENTRY_ENVIRONMENT=production
+      # Queue Configuration
+      - QUEUE_PROVIDER=${QUEUE_PROVIDER:-memory}
+      - SQS_QUEUE_URL=${SQS_QUEUE_URL:-}
       - DD_API_KEY=${DD_API_KEY:-placeholder}
-      - DD_ENV=staging
+      - DD_ENV=production
       - DD_SERVICE=saaspe-backend
       - DD_TRACE_ENABLED=false
       - HUBSPOT_API_KEY=${HUBSPOT_API_KEY:-placeholder}
@@ -63,8 +69,8 @@ services:
       - AWS_SECRET_NAME=${AWS_SECRET_NAME:-saaspe/encryption-key}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       # Application URLs
-      - BACKEND_URL=http://localhost:3000
-      - FRONTEND_URL=http://localhost:3002
+      - BACKEND_URL=${BACKEND_URL}
+      - FRONTEND_URL=${FRONTEND_URL}
     restart: always
     depends_on:
       postgres:

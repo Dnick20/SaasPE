@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import '../styles/design-tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: var(--slate-50);
+  --foreground: var(--slate-900);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: var(--slate-900);
+    --foreground: var(--slate-50);
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-family);
+  line-height: 1.5;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
